@@ -1,0 +1,139 @@
+.story {
+  position: absolute;
+  inset: 0;
+  display: flex;
+}
+.story-outline {
+  width: 220px;
+  flex: none;
+  border-right: var(--hair) solid var(--border);
+  padding: 16px 6px;
+  overflow: auto;
+}
+.outline-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  padding: 4px 10px;
+  color: var(--text-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.outline-item:hover {
+  color: var(--text);
+  background: var(--hover);
+}
+.outline-item.lvl-1 {
+  color: var(--text);
+}
+.outline-item.lvl-2 {
+  padding-left: 20px;
+}
+.outline-item.lvl-3 {
+  padding-left: 30px;
+  font-size: 11px;
+}
+.story-scroll {
+  flex: 1;
+  overflow: auto;
+}
+.story-col {
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 28px 28px 120px;
+}
+.memory-card {
+  background: var(--surface-raised);
+  border: var(--hair) solid var(--border);
+  padding: 12px 14px;
+  margin-bottom: 18px;
+}
+.memory-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+}
+.memory-card textarea {
+  width: 100%;
+  min-height: 110px;
+  resize: vertical;
+  background: transparent;
+  border: 0;
+  outline: none;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.story-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 0;
+  background: var(--bg);
+  border-bottom: var(--hair) solid var(--border);
+  margin-bottom: 14px;
+}
+.story-toolbar .btn {
+  margin-left: 6px;
+}
+.story-editor .ProseMirror {
+  outline: none;
+  min-height: 50vh;
+  font-size: 15.5px;
+  line-height: 1.7;
+  color: var(--text);
+  user-select: text;
+}
+.story-editor .ProseMirror h1 {
+  font-weight: 400;
+  font-size: 22px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 32px 0 10px;
+  color: var(--text-strong);
+}
+.story-editor .ProseMirror h2 {
+  font-weight: 500;
+  font-size: 16px;
+  margin: 22px 0 6px;
+  color: var(--text-strong);
+}
+.story-editor .ProseMirror h3 {
+  font-weight: 500;
+  font-size: 14px;
+  margin: 16px 0 4px;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.story-editor .ProseMirror p {
+  margin: 0 0 10px;
+}
+.story-editor .ProseMirror blockquote {
+  margin: 8px 0 12px;
+  padding-left: 14px;
+  border-left: 2px solid var(--accent);
+  font-style: italic;
+}
+.story-editor .ProseMirror ul,
+.story-editor .ProseMirror ol {
+  padding-left: 22px;
+}
+.story-editor .ProseMirror hr {
+  border: 0;
+  border-top: var(--hair) solid var(--border);
+  margin: 20px 0;
+}
+.story-editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-3);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
