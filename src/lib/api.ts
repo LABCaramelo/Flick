@@ -2,6 +2,7 @@ import type {
   AgentStreamEvent,
   ChatThread,
   ChatThreadSummary,
+  CostEstimate,
   GenerateRequest,
   JobState,
   ModelInfo,
@@ -64,6 +65,7 @@ export const api = {
   uploadDataUrl: (projectId: string, dataUrl: string) => req<UploadedMedia>('POST', `/api/projects/${projectId}/upload-dataurl`, { dataUrl }),
 
   generate: (r: GenerateRequest) => req<JobState>('POST', '/api/generate', r),
+  estimate: (r: GenerateRequest) => req<CostEstimate>('POST', '/api/estimate', r),
   cancelJob: (id: string) => req('POST', `/api/jobs/${id}/cancel`),
   listJobs: (projectId: string) => req<JobState[]>('GET', `/api/jobs?projectId=${projectId}`),
   exportTimeline: (projectId: string, timelineId: string, height: number, fps: number) =>

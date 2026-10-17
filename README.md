@@ -53,7 +53,7 @@ Abra http://localhost:5173.
 
 | Provedor | Uso |
 | --- | --- |
-| **Higgsfield API** (padrão com `HF_CREDENTIALS`) | SDK oficial `@higgsfield/client`; 83 endpoints catalogados de docs.higgsfield.ai com JSON Schema (`server/providers/higgsfield-catalog.json`). Mídias locais vão por upload pré-assinado. |
+| **Higgsfield API** (padrão com `HF_CREDENTIALS`) | SDK oficial `@higgsfield/client`; 83 endpoints catalogados de docs.higgsfield.ai com JSON Schema (`server/providers/higgsfield-catalog.json`). A interface lista os modelos do flick.art que existem na Higgsfield (`shared/actions.ts`), cada um mapeado para seus endpoints. O painel mostra o custo estimado antes de gerar (endpoint `/estimate` da Higgsfield ou tabela publicada, já com o desconto da conta). Áudio nativo vem desligado e pedidos pagos não são reenviados automaticamente. Mídias locais vão por upload pré-assinado. |
 | **Higgsfield MCP** | `https://mcp.higgsfield.ai/mcp` com OAuth; mapeia ações → ferramentas automaticamente (ajustável). Cobre o que a API não tem: voz, música, upscale, remoção de fundo. |
 | **Offline (simulado)** | Sem custo: gera imagens, vídeos e áudios de demonstração para testar fluxos. |
 

@@ -1,4 +1,4 @@
-import { ACTIONS } from '../../shared/actions';
+import { ACTIONS, defaultModelId, findModel, modelSettings } from '../../shared/actions';
 import { titleFromPrompt } from '../../shared/project';
 import { findStyle } from '../../shared/styles';
 import type { CanvasNode, GenerateRequest, JobState, MediaNode, MediaRef, TextNode } from '../../shared/types';
@@ -28,7 +28,13 @@ export function prepareGeneration(nodeId: string): PreparedGeneration | { error:
   const gs = node.data.generationSettings;
   if (!gs) return { error: 'este nó não tem configurações de geração' };
   const action = ACTIONS[gs.actionType];
-  const { model = 'auto', prompt: rawPrompt = '', ...settings } = gs.inputs as Record<string, unknown> & { model?: string; prompt?: string };
+  const { model: savedModel, prompt: rawPrompt = '', ...settings } = gs.inputs as Record<string, unknown> & { model?: string; prompt?: string };
+  // the model the panel shows: the saved one, else the action's default
+  const models = st().models;
+  const modelInfo = findModel(models, savedModel) ?? findModel(models, defaultModelId(models, gs.actionType));
+  const model = findModel(models, savedModel) ? savedModel! : modelInfo?.id ?? savedModel ?? 'auto';
+  // settings left untouched in the panel still go out with the value it shows
+  for (const s of modelSettings(modelInfo, gs.actionType)) if (settings[s.id] === undefined && s.defaultValue !== undefined) settings[s.id] = s.defaultValue;
 
   const mediaInputs: Record<string, MediaRef[]> = {};
   const textParts: string[] = [];

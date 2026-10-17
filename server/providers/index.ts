@@ -1,11 +1,11 @@
 import { ACTIONS } from '../../shared/actions';
-import type { ActionType, ModelInfo } from '../../shared/types';
+import type { ActionType, CostEstimate, GenerateRequest, ModelInfo } from '../../shared/types';
 import { GENERATION_PROVIDER } from '../config';
 import { SETTINGS_FILE, readJson, writeJson } from '../storage';
 import { HiggsfieldMcpProvider } from './higgsfield';
 import { HiggsfieldApiProvider, higgsfieldApiSupports } from './higgsfieldApi';
 import { MockProvider } from './mock';
-import { ProviderError, type GenerationProvider } from './types';
+import { ProviderError, type EstimateOptions, type GenerationProvider } from './types';
 
 export const higgsfieldApi = new HiggsfieldApiProvider();
 export const higgsfield = new HiggsfieldMcpProvider();
@@ -43,6 +43,18 @@ export async function providerFor(action: ActionType): Promise<GenerationProvide
   if (p !== higgsfieldApi || higgsfieldApiSupports(action)) return p;
   if ((await higgsfield.status()).connected) return higgsfield;
   throw new ProviderError(`"${ACTIONS[action].name}" não existe na API do Higgsfield. Conecte o Higgsfield MCP em Configurações (ele inclui ferramentas de voz/áudio) ou use o modo offline.`);
+}
+
+/** Expected charge of a generation, before it is submitted. */
+export async function estimateCost(r: GenerateRequest, opts: EstimateOptions): Promise<CostEstimate> {
+  let p: GenerationProvider;
+  try {
+    p = await providerFor(r.actionType);
+  } catch (err) {
+    return { usd: null, source: 'unknown', note: (err as Error).message };
+  }
+  if (p.estimate) return p.estimate(r, opts);
+  return { usd: null, source: 'unknown', note: `${p.name} não informa o custo antes de gerar.` };
 }
 
 /** Model catalog for the UI, including MCP models for actions the API lacks. */

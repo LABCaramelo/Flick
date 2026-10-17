@@ -128,10 +128,6 @@ function supports(action: ActionType, e: CatalogEntry): boolean {
   }
 }
 
-function actionsFor(e: CatalogEntry): ActionType[] {
-  return (Object.keys(ACTIONS) as ActionType[]).filter((a) => supports(a, e));
-}
-
 // ---------------------------------------------------------------------------
 // schema -> UI settings
 // ---------------------------------------------------------------------------
@@ -158,15 +154,17 @@ function durationOptions(p: Prop): string[] {
   return (picks.length ? picks : [min]).map(String);
 }
 
-function settingsFor(e: CatalogEntry): ModelSetting[] {
+function settingsFor(e: CatalogEntry, fixed: Record<string, unknown> = {}): ModelSetting[] {
   const out: ModelSetting[] = [];
   for (const [key, p] of Object.entries(props(e))) {
-    if (!(key in SETTING_LABEL)) continue;
+    if (!(key in SETTING_LABEL) || key in fixed) continue;
     let values: string[] | undefined;
     if (key === 'duration') values = durationOptions(p);
     else if (p.enum?.length) values = p.enum.map(String);
     if (!values?.length) continue;
-    const def = p.default !== undefined ? String(p.default) : key === 'duration' ? (values.includes('5') ? '5' : values[0]) : values[0];
+    let def = p.default !== undefined ? String(p.default) : key === 'duration' ? (values.includes('5') ? '5' : values[0]) : values[0];
+    // the API defaults to "high"; "standard" gives smaller files
+    if (key === 'bitrate_mode' && values.includes('standard')) def = 'standard';
     out.push({
       id: key === 'batch_size' ? 'num_images' : key,
       label: SETTING_LABEL[key],
@@ -175,6 +173,7 @@ function settingsFor(e: CatalogEntry): ModelSetting[] {
       defaultValue: def,
     });
   }
+  if (has(e, 'generate_audio', 'sound')) out.push(AUDIO_SETTING);
   return out;
 }
 
@@ -184,31 +183,32 @@ function titleOf(e: CatalogEntry): string {
 
 let modelCache: ModelInfo[] | null = null;
 
+/** The flick-aligned catalog, with actions and settings taken from each model's endpoints. */
 export function higgsfieldApiModels(): ModelInfo[] {
   if (modelCache) return modelCache;
-  const list = CATALOG.map((e) => ({
-    id: e.endpoint,
-    name: titleOf(e),
-    description: `${e.vendor} · ${e.endpoint}`,
-    actions: actionsFor(e),
-    settings: settingsFor(e),
-    providerModel: e.endpoint,
-  })).filter((m) => m.actions.length);
-  // preferred endpoints first so they become each action's default
-  const rank = (m: ModelInfo) => {
-    let best = 999;
-    for (const a of m.actions) {
-      const i = PREFERRED[a]?.indexOf(m.id) ?? -1;
-      if (i >= 0) best = Math.min(best, i);
-    }
-    return best;
-  };
-  modelCache = list.sort((a, b) => rank(a) - rank(b));
+  modelCache = DEFAULT_MODELS.flatMap((m): ModelInfo[] => {
+    const entries = alignedEntries(m.id);
+    const actions = (Object.keys(ACTIONS) as ActionType[]).filter((a) => entries.some((e) => supports(a, e)));
+    if (!actions.length) return [];
+    const settingsByAction: Partial<Record<ActionType, ModelSetting[]>> = {};
+    for (const a of actions) settingsByAction[a] = settingsFor(endpointFor(m.id, a)!, ALIGNED[m.id].fixed);
+    return [
+      {
+        ...m,
+        description: `${m.description ?? ''} · Higgsfield: ${titleOf(entries[0]).split(' · ')[0]}`.replace(/^ · /, ''),
+        actions,
+        settings: settingsByAction[actions[0]],
+        settingsByAction,
+        aliases: entries.map((e) => e.endpoint),
+        providerModel: entries[0].endpoint,
+      },
+    ];
+  });
   return modelCache;
 }
 
 export function higgsfieldApiSupports(action: ActionType): boolean {
-  return CATALOG.some((e) => supports(action, e));
+  return defaultAlignedFor(action) !== undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +250,14 @@ function pickProp(e: CatalogEntry, names: string[], used: Set<string>): string |
   return names.find((n) => n in props(e) && !used.has(n));
 }
 
-export function buildInput(e: CatalogEntry, r: GenerateRequest, media: Record<string, string[]>): Record<string, unknown> {
+interface BuildOptions {
+  /** inputs pinned by the chosen model */
+  fixed?: Record<string, unknown>;
+  /** skip the required-field check (cost estimates) */
+  lenient?: boolean;
+}
+
+export function buildInput(e: CatalogEntry, r: GenerateRequest, media: Record<string, string[]>, opts: BuildOptions = {}): Record<string, unknown> {
   const P = props(e);
   const used = new Set<string>();
   const input: Record<string, unknown> = {};
@@ -313,8 +320,15 @@ export function buildInput(e: CatalogEntry, r: GenerateRequest, media: Record<st
     if (c !== undefined) input[k] = c;
   }
 
+  // native audio is opt-in: the API turns it on by default and it raises the price
+  const audio = s.audio === true || s.audio === 'true';
+  if ('generate_audio' in P) input.generate_audio = audio;
+  if ('sound' in P) input.sound = audio ? 'on' : 'off';
+  if ('bitrate_mode' in P && input.bitrate_mode === undefined) input.bitrate_mode = 'standard';
+  for (const [k, v] of Object.entries(opts.fixed ?? {})) if (k in P) input[k] = v;
+
   const missing = req(e).filter((k) => input[k] === undefined || (Array.isArray(input[k]) && !(input[k] as unknown[]).length));
-  if (missing.length) {
+  if (missing.length && !opts.lenient) {
     const human: Record<string, string> = { image_url: 'imagem de entrada', image_urls: 'imagens de referência', video_url: 'vídeo de origem', video_urls: 'vídeos de referência', prompt: 'prompt', first_frame_url: 'quadro inicial', preset_id: 'preset' };
     throw new ProviderError(`${titleOf(e)} precisa de: ${missing.map((m) => human[m] ?? m).join(', ')}`);
   }
@@ -339,6 +353,64 @@ async function normalizeForUpload(file: string, kind: MediaKind): Promise<{ file
 }
 
 // ---------------------------------------------------------------------------
+// pricing
+// ---------------------------------------------------------------------------
+
+// POST /estimate/<endpoint> returns an exact quote for most models. Seedance
+// and Wan 3.0 answer with their published rate instead ("description"); the
+// rates below are those descriptions (October 2026), before the account
+// discount.
+
+const SHORT_SIDE: Record<string, number> = { '480p': 480, '720p': 720, '1080p': 1080 };
+
+function outputArea(resolution: string, aspect: unknown): number | undefined {
+  const short = SHORT_SIDE[resolution];
+  if (!short) return undefined;
+  const [a, b] = String(aspect ?? '16:9').split(':').map(Number);
+  return short * short * (a > 0 && b > 0 ? Math.max(a, b) / Math.min(a, b) : 16 / 9);
+}
+
+/** list price in USD from the published rate, or undefined when the model has none we know */
+function formulaUsd(e: CatalogEntry, input: Record<string, unknown>, opts: EstimateOptions): number | undefined {
+  const P = props(e);
+  const seconds = Number(input.duration ?? P.duration?.default ?? 5);
+  const resolution = String(input.resolution ?? P.resolution?.default ?? '720p');
+  const tokens = (area: number, secs: number) => Math.ceil((area * secs * 24) / 1024) / 1000; // thousands of video tokens
+
+  if (e.endpoint.startsWith('bytedance/seedance-2.5/')) {
+    const area = outputArea(resolution, input.aspect_ratio);
+    if (!area) return undefined;
+    // source video is billed too, at 0.6x the rate
+    const withVideo = /video-edit|video-extend/.test(e.workflow) || (Array.isArray(input.video_urls) && input.video_urls.length > 0);
+    const inputSecs = withVideo ? opts.inputVideoSeconds ?? 0 : 0;
+    if (withVideo && !inputSecs) return undefined;
+    const generated = e.workflow === 'video-edit' ? inputSecs : seconds; // an edit is as long as its source
+    const rate = (resolution === '1080p' ? 0.0234 : 0.0214) * (withVideo ? 0.6 : 1);
+    return tokens(area, inputSecs + generated) * rate;
+  }
+  if (e.endpoint.startsWith('bytedance/seedance-2.0/')) {
+    const area = outputArea(resolution, input.aspect_ratio);
+    return area ? tokens(area, seconds) * 0.014 : undefined;
+  }
+  if (e.endpoint.startsWith('alibaba/wan-3.0/')) {
+    const perSecond: Record<string, number> = { '480p': 0.05, '720p': 0.1, '1080p': 0.2 };
+    return perSecond[resolution] !== undefined ? perSecond[resolution] * seconds : undefined;
+  }
+  return undefined;
+}
+
+interface EstimateResponse {
+  type?: string;
+  usd?: string;
+  credits?: string;
+  discount?: { percentage?: string; usd?: string } | null;
+  pricing_description?: string;
+}
+
+const ESTIMATE_TTL = 10 * 60_000;
+const PLACEHOLDER: Record<string, string> = { image: 'png', video: 'mp4', audio: 'mp3' };
+
+// ---------------------------------------------------------------------------
 // provider
 // ---------------------------------------------------------------------------
 
@@ -355,6 +427,9 @@ export class HiggsfieldApiProvider implements GenerationProvider {
   private client?: HiggsfieldClient;
   private lastError?: string;
   private uploadCache = new Map<string, string>();
+  private estimates = new Map<string, { at: number; value: CostEstimate }>();
+  /** account discount (%) learned from quotes; applied to published rates */
+  private discountPct?: number;
 
   configured(): boolean {
     return /^[^:\s]+:[^:\s]+$/.test(HF_CREDENTIALS);
@@ -362,7 +437,9 @@ export class HiggsfieldApiProvider implements GenerationProvider {
 
   private sdk(): HiggsfieldClient {
     if (!this.configured()) throw new ProviderError('Defina HF_CREDENTIALS (key-id:key-secret) no .env.local para usar a API do Higgsfield.');
-    this.client ??= createHiggsfieldClient({ credentials: HF_CREDENTIALS, timeout: 120_000, maxRetries: 2 });
+    // no automatic resubmission: a retried submit after a timeout or 5xx can
+    // start (and bill) a second generation
+    this.client ??= createHiggsfieldClient({ credentials: HF_CREDENTIALS, timeout: 120_000, maxRetries: 0 });
     return this.client;
   }
 
@@ -376,7 +453,7 @@ export class HiggsfieldApiProvider implements GenerationProvider {
       name: this.name,
       connected: this.configured(),
       error: this.configured() ? this.lastError : 'HF_CREDENTIALS ausente no .env.local',
-      detail: `${higgsfieldApiModels().length} endpoints · api.higgsfield.ai`,
+      detail: `${higgsfieldApiModels().length} modelos alinhados ao flick · api.higgsfield.ai`,
     };
   }
 
@@ -410,37 +487,108 @@ export class HiggsfieldApiProvider implements GenerationProvider {
     }
   }
 
-  resolveEndpoint(r: GenerateRequest): CatalogEntry {
+  /** endpoint (and pinned inputs) that will run `r` */
+  resolveEndpoint(r: GenerateRequest): { entry: CatalogEntry; fixed?: Record<string, unknown> } {
     const hasImage = Object.values(r.mediaInputs).flat().some((r) => r.type === 'image');
+    // raw endpoint ids come from projects saved before the flick-aligned catalog
     let entry = CATALOG.find((e) => e.endpoint === r.model && supports(r.actionType, e));
-    if (!entry) {
-      const ranked = higgsfieldApiModels().filter((m) => m.actions.includes(r.actionType));
-      // for prompt-only video/image requests prefer endpoints that need no media
-      const pick = ranked.find((m) => {
-        const e = CATALOG.find((c) => c.endpoint === m.id)!;
-        return hasImage || !req(e).some((r) => /image|video|frame/.test(r));
-      }) ?? ranked[0];
-      entry = pick ? CATALOG.find((e) => e.endpoint === pick.id) : undefined;
+    if (entry) {
+      // a text-only request on an image-to-video endpoint: switch to the family's text-to-video sibling
+      if (!hasImage && req(entry).some((r) => /image_url|first_frame/.test(r))) {
+        const sibling = CATALOG.find((e) => e.family === entry!.family && /text-to-video|text-to-image/.test(e.workflow) && !req(e).some((r) => /image|video/.test(r)));
+        if (sibling) entry = sibling;
+      }
+      return { entry };
     }
-    if (!entry) throw new ProviderError(`A API do Higgsfield não tem modelo para "${ACTIONS[r.actionType].name}".`);
-    // a text-only request on an image-to-video endpoint: switch to the family's text-to-video sibling
-    if (!hasImage && req(entry).some((r) => /image_url|first_frame/.test(r))) {
-      const sibling = CATALOG.find((e) => e.family === entry!.family && /text-to-video|text-to-image/.test(e.workflow) && !req(e).some((r) => /image|video/.test(r)));
-      if (sibling) entry = sibling;
+    const id = ALIGNED[r.model] && endpointFor(r.model, r.actionType) ? r.model : defaultAlignedFor(r.actionType);
+    entry = id ? endpointFor(id, r.actionType, hasImage) : undefined;
+    if (!id || !entry) throw new ProviderError(`A API do Higgsfield não tem modelo para "${ACTIONS[r.actionType].name}".`);
+    return { entry, fixed: ALIGNED[id].fixed };
+  }
+
+  /** Expected charge for `r`, from Higgsfield's estimate endpoint or its published rate. */
+  async estimate(r: GenerateRequest, opts: EstimateOptions = {}): Promise<CostEstimate> {
+    if (!this.configured()) return { usd: null, source: 'unknown', note: 'Defina HF_CREDENTIALS no .env.local para ver o custo.' };
+    let resolved: ReturnType<HiggsfieldApiProvider['resolveEndpoint']>;
+    try {
+      resolved = this.resolveEndpoint(r);
+    } catch (err) {
+      return { usd: null, source: 'unknown', note: (err as Error).message };
     }
-    return entry;
+    const { entry, fixed } = resolved;
+    // the estimate never fetches media: provider-hosted URLs are reused, the rest get a placeholder
+    const media: Record<string, string[]> = {};
+    for (const [inputId, refs] of Object.entries(r.mediaInputs)) {
+      media[inputId] = refs
+        .filter((ref) => ref.type !== 'text')
+        .map((ref) => ref.remoteUrl ?? (ref.url && /^https?:\/\//.test(ref.url) ? ref.url : `https://example.com/claquete-estimate.${PLACEHOLDER[ref.type]}`));
+    }
+    const input = buildInput(entry, { ...r, prompt: 'estimate' }, media, { fixed, lenient: true });
+    const key = `${entry.endpoint} ${JSON.stringify(input)} ${opts.inputVideoSeconds ?? 0}`;
+    const hit = this.estimates.get(key);
+    if (hit && Date.now() - hit.at < ESTIMATE_TTL) return hit.value;
+    const value = await this.quote(entry, input, opts);
+    if (value.usd !== null) this.estimates.set(key, { at: Date.now(), value });
+    return value;
+  }
+
+  private async quote(entry: CatalogEntry, input: Record<string, unknown>, opts: EstimateOptions): Promise<CostEstimate> {
+    const endpoint = entry.endpoint;
+    let data: EstimateResponse;
+    try {
+      const res = await fetch(`${API_BASE}/estimate/${endpoint}`, {
+        method: 'POST',
+        headers: { ...this.authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return { usd: null, source: 'unknown', endpoint, note: `A Higgsfield não estimou este pedido (HTTP ${res.status}).` };
+      data = (await res.json()) as EstimateResponse;
+    } catch (err) {
+      return { usd: null, source: 'unknown', endpoint, note: `Sem estimativa: ${(err as Error).message}` };
+    }
+    if (data.usd !== undefined) {
+      const usd = Number(data.usd);
+      const discountPct = data.discount?.percentage ? Number(data.discount.percentage) : undefined;
+      if (discountPct !== undefined) this.discountPct = discountPct;
+      const listUsd = data.discount?.usd ? usd + Number(data.discount.usd) : usd;
+      return { usd, listUsd, discountPct, source: 'quote', endpoint, note: 'Estimativa da Higgsfield para esta configuração.' };
+    }
+    const listUsd = formulaUsd(entry, input, opts);
+    if (listUsd === undefined) {
+      return { usd: null, source: 'unknown', endpoint, note: 'Cobrado por tokens: a Higgsfield só fecha o valor ao fim da geração.' };
+    }
+    const discountPct = await this.accountDiscount();
+    return {
+      usd: discountPct ? listUsd * (1 - discountPct / 100) : listUsd,
+      listUsd,
+      discountPct,
+      source: 'formula',
+      endpoint,
+      note: 'Calculado pela tabela da Higgsfield (resolução × duração)' + (discountPct === undefined ? ', sem o desconto da conta.' : '.'),
+    };
+  }
+
+  /** the account discount shows up on exact quotes; ask for one if none was seen yet */
+  private async accountDiscount(): Promise<number | undefined> {
+    if (this.discountPct !== undefined) return this.discountPct;
+    const probe = BY_ENDPOINT.get('kling-video/v3.0/std/image-to-video');
+    if (!probe) return undefined;
+    const q = await this.quote(probe, { prompt: 'estimate', image_url: 'https://example.com/claquete-estimate.png', duration: 5, sound: 'off' }, {});
+    if (q.source === 'quote') this.discountPct = q.discountPct ?? 0;
+    return this.discountPct;
   }
 
   async generate(r: GenerateRequest, ctx: ProviderContext): Promise<RawOutput[]> {
     const client = this.sdk();
-    const entry = this.resolveEndpoint(r);
+    const { entry, fixed } = this.resolveEndpoint(r);
     ctx.progress(3, 'Enviando referências…');
     const media: Record<string, string[]> = {};
     for (const [inputId, refs] of Object.entries(r.mediaInputs)) {
       media[inputId] = [];
       for (const ref of refs) if (ref.type !== 'text') media[inputId].push(await this.upload(ref, ctx));
     }
-    const input = buildInput(entry, r, media);
+    const input = buildInput(entry, r, media, { fixed });
 
     ctx.progress(8, `Enviando para ${titleOf(entry)}…`);
     let submitted: V2Response;

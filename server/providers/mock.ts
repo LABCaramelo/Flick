@@ -4,7 +4,7 @@ import path from 'node:path';
 import { DEFAULT_MODELS } from '../../shared/actions';
 import { ACTIONS } from '../../shared/actions';
 import { aspectToSize } from '../../shared/project';
-import type { GenerateRequest, ModelInfo, ProviderStatus } from '../../shared/types';
+import type { CostEstimate, GenerateRequest, ModelInfo, ProviderStatus } from '../../shared/types';
 import { run } from '../media';
 import { paintPlaceholder } from '../util/png';
 import type { GenerationProvider, ProviderContext, RawOutput } from './types';
@@ -43,6 +43,10 @@ export class MockProvider implements GenerationProvider {
 
   async models(): Promise<ModelInfo[]> {
     return DEFAULT_MODELS;
+  }
+
+  async estimate(): Promise<CostEstimate> {
+    return { usd: 0, source: 'free', note: 'Modo offline: nada é cobrado.' };
   }
 
   async generate(req: GenerateRequest, ctx: ProviderContext): Promise<RawOutput[]> {

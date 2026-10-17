@@ -1,4 +1,4 @@
-import type { GenerateRequest, MediaKind, MediaRef, ModelInfo, ProviderStatus } from '../../shared/types';
+import type { CostEstimate, GenerateRequest, MediaKind, MediaRef, ModelInfo, ProviderStatus } from '../../shared/types';
 
 export interface RawOutput {
   /** remote URL or data URI */
@@ -16,12 +16,19 @@ export interface ProviderContext {
   localFile(ref: MediaRef): string | undefined;
 }
 
+export interface EstimateOptions {
+  /** total length of the source videos, for models that bill input video */
+  inputVideoSeconds?: number;
+}
+
 export interface GenerationProvider {
   id: string;
   name: string;
   status(): Promise<ProviderStatus>;
   models(): Promise<ModelInfo[]>;
   generate(req: GenerateRequest, ctx: ProviderContext): Promise<RawOutput[]>;
+  /** expected charge, when the provider can tell before generating */
+  estimate?(req: GenerateRequest, opts: EstimateOptions): Promise<CostEstimate>;
 }
 
 export class ProviderError extends Error {

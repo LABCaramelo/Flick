@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, Upload, X, MousePointer2 } from 'lucide-react';
-import { ACTIONS, actionsForOutput, modelsForAction } from '../../../shared/actions';
+import { ACTIONS, actionsForOutput, defaultModelId, findModel, modelSettings, modelsForAction } from '../../../shared/actions';
 import { nodeTitle } from '../../../shared/project';
 import { STYLE_PRESETS } from '../../../shared/styles';
 import type { ActionType, MediaNode, ModelSetting } from '../../../shared/types';
 import { useProject } from '../../store/project';
 import { toast } from '../../store/ui';
 import { connect, disconnect, pickFiles, setNodeAction, uploadFilesToCanvas } from '../../lib/canvasOps';
+import { describeCost, useCostEstimate } from '../../lib/cost';
 import { cancelGeneration, runGeneration } from '../../lib/generation';
 import { Dropdown, Popover, anchorBelow, type Anchor } from '../ui/Menu';
 
@@ -42,12 +43,13 @@ export function GeneratorPanel({ nodeId, x, y }: { nodeId: string; x: number; y:
   const gs = node?.data.generationSettings;
   const action = gs ? ACTIONS[gs.actionType] : undefined;
   const incoming = useMemo(() => (edges ?? []).filter((e) => e.target === nodeId), [edges, nodeId]);
+  const cost = describeCost(useCostEstimate(nodeId));
   if (!node || !gs || !action || !nodes) return null;
 
   const busy = node.data.status === 'queued' || node.data.status === 'processing';
   const modelList = modelsForAction(models, gs.actionType);
-  const model = modelList.find((m) => m.id === gs.inputs.model) ?? modelList[0];
-  const settings: ModelSetting[] = model?.settings ?? [];
+  const model = findModel(modelList, gs.inputs.model) ?? findModel(modelList, defaultModelId(models, gs.actionType)) ?? modelList[0];
+  const settings: ModelSetting[] = modelSettings(model, gs.actionType);
   const hasStyle = action.common.some((c) => c.id === 'style') || action.output === 'image';
   const promptDef = action.common.find((c) => c.id === 'prompt');
   const versions = node.data.versions ?? [];
@@ -141,6 +143,16 @@ export function GeneratorPanel({ nodeId, x, y }: { nodeId: string; x: number; y:
               width={180}
             />
           ))}
+        {settings
+          .filter((s) => s.type === 'checkbox')
+          .map((s) => {
+            const on = (gs.inputs[s.id] ?? s.defaultValue) === true;
+            return (
+              <button key={s.id} className={`chip ${on ? 'on' : ''}`} title={s.id === 'audio' ? 'Áudio nativo encarece a geração na maioria dos modelos' : s.label} onClick={() => setInput(s.id, !on)}>
+                {s.label}: {on ? 'sim' : 'não'}
+              </button>
+            );
+          })}
         {hasStyle && (
           <Dropdown
             value={gs.styleId ?? '__project'}
@@ -266,6 +278,11 @@ export function GeneratorPanel({ nodeId, x, y }: { nodeId: string; x: number; y:
           {busy ? (node.data.status === 'queued' ? 'Na fila…' : `Gerando… ${node.data.progress ?? 0}%`) : model?.estimatedTime ? `Tempo estimado ${model.estimatedTime}` : action.description}
         </span>
         <div className="row">
+          {!busy && cost.label && (
+            <span className="gp-cost" title={cost.title}>
+              {cost.label}
+            </span>
+          )}
           {busy && (
             <button className="btn btn-sm" onClick={() => cancelGeneration(nodeId)}>
               Cancelar

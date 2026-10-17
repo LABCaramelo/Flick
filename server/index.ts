@@ -9,7 +9,7 @@ import { subscribe } from './events';
 import { startExport } from './export';
 import { cancelJob, getJob, listJobs, startGeneration } from './jobs';
 import { downloadToProject, kindFromName, saveBuffer } from './media';
-import { activeModels, activeProviderId, allProviders, higgsfield, initProviders, setActiveProvider } from './providers';
+import { activeModels, activeProviderId, allProviders, estimateCost, higgsfield, initProviders, setActiveProvider } from './providers';
 import { CALLBACK_PATH } from './providers/higgsfield';
 import { createProject, deleteProject, duplicateProject, ensureDirs, getProject, listProjects, patchProject, saveProject } from './storage';
 
@@ -95,6 +95,19 @@ app.post('/api/generate', h(async (req, res) => {
   const job = startGeneration(body);
   const { request, ...pub } = job;
   res.json(pub);
+}));
+
+app.post('/api/estimate', h(async (req, res) => {
+  const body = req.body as GenerateRequest;
+  if (!body?.projectId || !body.actionType) return res.status(400).json({ error: 'requisição incompleta' });
+  // models that bill the source video need its length, which lives on the canvas node
+  const project = await getProject(body.projectId);
+  let inputVideoSeconds = 0;
+  for (const ref of Object.values(body.mediaInputs ?? {}).flat()) {
+    const node = ref.type === 'video' ? project?.nodes[ref.nodeId] : undefined;
+    if (node && 'duration' in node.data) inputVideoSeconds += Number(node.data.duration) || 0;
+  }
+  res.json(await estimateCost(body, { inputVideoSeconds }));
 }));
 
 app.get('/api/jobs', (req, res) => {
