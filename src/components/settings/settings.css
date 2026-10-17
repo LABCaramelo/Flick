@@ -90,7 +90,7 @@
 .tool-item pre,
 .small-pre {
   font-size: 10.5px;
-  background: #0d0d0d;
+  background: rgb(var(--cm-stage));
   padding: 8px;
   max-height: 220px;
   overflow: auto;
@@ -99,4 +99,20 @@
 }
 details summary {
   cursor: pointer;
+}
+
+
+/* ——— Caramelo · interação (gerado pelo MCP) ——— */
+.provider-card input:focus-visible {
+  outline: none;
+  border-color: rgb(var(--cm-accent) / 0.7);
+  box-shadow: 0 0 0 3px rgb(var(--cm-accent) / 0.15);
+}
+
+.provider-card input::placeholder {
+  color: rgb(var(--cm-fg-dim));
+}
+
+.provider-card input {
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
 }

@@ -69,3 +69,13 @@ index.ts    exemplo do SDK do Higgsfield
 ```
 
 Dados ficam em `data/` (projetos, mídias, conversas, credenciais OAuth do MCP).
+
+## Identidade visual (Um Cara Caramelo)
+
+A interface segue o Design System Caramelo (material Lumen, tema escuro). Os arquivos vêm do pacote `@caramelo/design-system` e ficam copiados no repo, para o build não depender da pasta local do Design System:
+
+- `src/styles/caramelo/`: `caramelo.css` (tokens `--cm-*`, fontes Montserrat/Inter/Covered By Your Grace auto-hospedadas, barras de rolagem, glitch e rastro). Não edite esse arquivo; os ajustes do Claquete ficam em `src/styles/global.css`, que mapeia as variáveis do app para os papéis Caramelo.
+- `public/caramelo/`: isotipo (`brand/`, também usado como favicon) e as 28 figurinhas do rastro (`stickers/`).
+- `src/components/ui/caramelo/`: `Isotype` e `PointerTrail`, portados do pacote. O rastro aparece no topo da Home.
+
+Para atualizar, copie de novo `dist/styles.css`, `dist/fonts/` e `src/assets/` do Design System.

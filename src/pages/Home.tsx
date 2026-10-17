@@ -6,6 +6,7 @@ import { STYLE_PRESETS } from '../../shared/styles';
 import { ASPECT_RATIOS } from '../../shared/actions';
 import { api } from '../lib/api';
 import { Brand } from '../components/ui/Brand';
+import { PointerTrail } from '../components/ui/caramelo/PointerTrail';
 import { Dropdown, Popover, anchorBelow, type Anchor } from '../components/ui/Menu';
 import { ProviderPill } from '../components/settings/ProviderPill';
 import { useUi, toast } from '../store/ui';
@@ -95,9 +96,13 @@ export function Home() {
 
       <main className="home-main">
         {!showAll && (
+          <PointerTrail className="hero-band">
           <section className="hero">
-            <h1>Que história você quer criar hoje?</h1>
-            <p className="muted">Peça ao agente qualquer coisa.</p>
+            <span className="hero-eyebrow">Laboratório de cinema com IA</span>
+            <h1>
+              Que história você quer <span className="cm-spectrum-text">criar hoje?</span>
+            </h1>
+            <p className="hand-note hero-note">peça ao agente qualquer coisa</p>
             <div className="hero-box">
               <textarea
                 ref={taRef}
@@ -142,6 +147,7 @@ export function Home() {
               ))}
             </div>
           </section>
+          </PointerTrail>
         )}
 
         <section className="projects">

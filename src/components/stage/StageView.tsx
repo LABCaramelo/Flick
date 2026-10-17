@@ -13,7 +13,8 @@ import { MOVES, defaultPose, lerpPose, presetEnd } from './cameraMoves';
 import { Stage3D, applyPose, readPose, type PlaybackRequest, type StageBridge } from './Stage3D';
 import './stage.css';
 
-const COLORS = ['#c9c4bb', '#cda370', '#bb8be4', '#6aa9e0', '#8fbf7a', '#e0846a'];
+// soft Caramelo spectrum + Warm Cream for stand-ins
+const COLORS = ['#d9d3cc', '#ffae7b', '#b6a5ff', '#8adeff', '#ffe889', '#ff8fbd'];
 
 export function StageView() {
   const stage = useProject((s) => s.project?.stage);
@@ -253,7 +254,7 @@ export function StageView() {
           <Play size={12} /> Ensaiar
         </button>
         <button className="btn btn-sm btn-primary" onClick={record} disabled={recording} title="Captura os quadros inicial/final, gera 2 quadros finalizados e o vídeo do plano">
-          <Circle size={10} fill="#f9634e" color="#f9634e" /> {recording ? 'Gravando…' : 'Gravar'}
+          <Circle size={10} fill="#FF3D8D" color="#FF3D8D" /> {recording ? 'Gravando…' : 'Gravar'}
         </button>
         <span style={{ width: 12 }} />
         <button className={`chip ${!topView ? 'on' : ''}`} onClick={() => setTopView(false)}>

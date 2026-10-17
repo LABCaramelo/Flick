@@ -1,0 +1,374 @@
+{
+  "source": "rastro mouse.png",
+  "sourceWidth": 1122,
+  "sourceHeight": 1402,
+  "sourceSha256": "1c990f473a4af293128a4523cd36d5a24060a7bad2e69caad29d77774ca1088a",
+  "format": "webp-lossless",
+  "count": 28,
+  "stickers": [
+    {
+      "id": "cadeira",
+      "label": "Cadeira de plástico",
+      "file": "cadeira.webp",
+      "width": 278,
+      "height": 336,
+      "sourceBounds": [
+        12,
+        26,
+        278,
+        350
+      ]
+    },
+    {
+      "id": "copo",
+      "label": "Copo de bar",
+      "file": "copo.webp",
+      "width": 208,
+      "height": 255,
+      "sourceBounds": [
+        278,
+        51,
+        474,
+        294
+      ]
+    },
+    {
+      "id": "lata",
+      "label": "Lata de bebida",
+      "file": "lata.webp",
+      "width": 198,
+      "height": 289,
+      "sourceBounds": [
+        459,
+        35,
+        645,
+        312
+      ]
+    },
+    {
+      "id": "spray",
+      "label": "Lata de spray",
+      "file": "spray.webp",
+      "width": 187,
+      "height": 332,
+      "sourceBounds": [
+        616,
+        46,
+        791,
+        366
+      ]
+    },
+    {
+      "id": "violao",
+      "label": "Violão",
+      "file": "violao.webp",
+      "width": 328,
+      "height": 390,
+      "sourceBounds": [
+        790,
+        12,
+        1106,
+        390
+      ]
+    },
+    {
+      "id": "bola",
+      "label": "Bola de futebol",
+      "file": "bola.webp",
+      "width": 262,
+      "height": 255,
+      "sourceBounds": [
+        12,
+        324,
+        262,
+        567
+      ]
+    },
+    {
+      "id": "chinelo",
+      "label": "Chinelo",
+      "file": "chinelo.webp",
+      "width": 223,
+      "height": 302,
+      "sourceBounds": [
+        260,
+        297,
+        471,
+        587
+      ]
+    },
+    {
+      "id": "onibus",
+      "label": "Ônibus",
+      "file": "onibus.webp",
+      "width": 427,
+      "height": 243,
+      "sourceBounds": [
+        452,
+        356,
+        867,
+        587
+      ]
+    },
+    {
+      "id": "capacete",
+      "label": "Capacete",
+      "file": "capacete.webp",
+      "width": 267,
+      "height": 285,
+      "sourceBounds": [
+        865,
+        366,
+        1120,
+        639
+      ]
+    },
+    {
+      "id": "poste",
+      "label": "Poste com fios",
+      "file": "poste.webp",
+      "width": 327,
+      "height": 311,
+      "sourceBounds": [
+        0,
+        529,
+        315,
+        828
+      ]
+    },
+    {
+      "id": "luminaria",
+      "label": "Luminária de rua",
+      "file": "luminaria.webp",
+      "width": 320,
+      "height": 255,
+      "sourceBounds": [
+        212,
+        579,
+        520,
+        822
+      ]
+    },
+    {
+      "id": "rolo",
+      "label": "Rolo de pintura",
+      "file": "rolo.webp",
+      "width": 272,
+      "height": 291,
+      "sourceBounds": [
+        427,
+        597,
+        687,
+        876
+      ]
+    },
+    {
+      "id": "caderno",
+      "label": "Caderno",
+      "file": "caderno.webp",
+      "width": 252,
+      "height": 285,
+      "sourceBounds": [
+        663,
+        577,
+        903,
+        850
+      ]
+    },
+    {
+      "id": "camera",
+      "label": "Câmera",
+      "file": "camera.webp",
+      "width": 256,
+      "height": 239,
+      "sourceBounds": [
+        878,
+        617,
+        1122,
+        844
+      ]
+    },
+    {
+      "id": "bilhete",
+      "label": "Bilhete de ônibus",
+      "file": "bilhete.webp",
+      "width": 286,
+      "height": 175,
+      "sourceBounds": [
+        11,
+        812,
+        285,
+        975
+      ]
+    },
+    {
+      "id": "caneca",
+      "label": "Caneca com coração",
+      "file": "caneca.webp",
+      "width": 240,
+      "height": 213,
+      "sourceBounds": [
+        294,
+        802,
+        522,
+        1003
+      ]
+    },
+    {
+      "id": "folha",
+      "label": "Folha de bananeira",
+      "file": "folha.webp",
+      "width": 381,
+      "height": 262,
+      "sourceBounds": [
+        461,
+        836,
+        830,
+        1086
+      ]
+    },
+    {
+      "id": "planta",
+      "label": "Planta no vaso",
+      "file": "planta.webp",
+      "width": 344,
+      "height": 375,
+      "sourceBounds": [
+        787,
+        796,
+        1119,
+        1159
+      ]
+    },
+    {
+      "id": "raio",
+      "label": "Raio",
+      "file": "raio.webp",
+      "width": 159,
+      "height": 257,
+      "sourceBounds": [
+        5,
+        961,
+        152,
+        1206
+      ]
+    },
+    {
+      "id": "coracao",
+      "label": "Coração",
+      "file": "coracao.webp",
+      "width": 170,
+      "height": 216,
+      "sourceBounds": [
+        146,
+        952,
+        304,
+        1156
+      ]
+    },
+    {
+      "id": "olho",
+      "label": "Olho",
+      "file": "olho.webp",
+      "width": 239,
+      "height": 231,
+      "sourceBounds": [
+        268,
+        1001,
+        495,
+        1220
+      ]
+    },
+    {
+      "id": "arcos",
+      "label": "Arcos sobre a água",
+      "file": "arcos.webp",
+      "width": 393,
+      "height": 263,
+      "sourceBounds": [
+        478,
+        989,
+        859,
+        1240
+      ]
+    },
+    {
+      "id": "caramelo",
+      "label": "Cão caramelo",
+      "file": "caramelo.webp",
+      "width": 351,
+      "height": 251,
+      "sourceBounds": [
+        10,
+        1151,
+        349,
+        1390
+      ]
+    },
+    {
+      "id": "palmeira",
+      "label": "Palmeira",
+      "file": "palmeira.webp",
+      "width": 200,
+      "height": 216,
+      "sourceBounds": [
+        328,
+        1186,
+        516,
+        1390
+      ]
+    },
+    {
+      "id": "estrelas",
+      "label": "Estrelas",
+      "file": "estrelas.webp",
+      "width": 202,
+      "height": 187,
+      "sourceBounds": [
+        504,
+        1209,
+        694,
+        1384
+      ]
+    },
+    {
+      "id": "coroa",
+      "label": "Coroa",
+      "file": "coroa.webp",
+      "width": 207,
+      "height": 178,
+      "sourceBounds": [
+        688,
+        1219,
+        883,
+        1385
+      ]
+    },
+    {
+      "id": "seta",
+      "label": "Seta",
+      "file": "seta.webp",
+      "width": 247,
+      "height": 147,
+      "sourceBounds": [
+        875,
+        1237,
+        1110,
+        1372
+      ]
+    },
+    {
+      "id": "conexoes",
+      "label": "Conexões",
+      "file": "conexoes.webp",
+      "width": 183,
+      "height": 180,
+      "sourceBounds": [
+        942,
+        1093,
+        1113,
+        1261
+      ]
+    }
+  ]
+}

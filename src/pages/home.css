@@ -8,31 +8,52 @@
   overflow: auto;
   padding: 0 32px 60px;
 }
+.hero-band {
+  margin: 0 -32px;
+  padding: 0 32px;
+}
 .hero {
+  position: relative;
+  z-index: 3;
   max-width: 780px;
   margin: 0 auto;
-  padding: 72px 0 36px;
+  padding: 76px 0 40px;
   text-align: center;
 }
-.hero h1 {
-  font-weight: 400;
-  font-size: 28px;
-  letter-spacing: 0.01em;
-  margin: 0 0 6px;
-  color: var(--text-strong);
+.hero-eyebrow {
+  display: inline-block;
+  margin-bottom: 14px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
-.hero p {
-  margin: 0 0 22px;
-  font-size: 13px;
+.hero h1 {
+  font-family: var(--font-display);
+  font-weight: 900;
+  font-size: clamp(32px, 4.4vw, 52px);
+  line-height: 0.98;
+  letter-spacing: -0.065em;
+  margin: 0 0 10px;
+  color: var(--text-strong);
+  text-wrap: balance;
+}
+.hero-note {
+  margin: 0 0 24px;
+  font-size: 22px;
 }
 .hero-box {
   border: var(--hair) solid var(--border);
+  border-radius: var(--radius-lg);
   background: var(--surface-raised);
+  box-shadow: var(--shadow-md);
   text-align: left;
-  transition: border-color 0.15s;
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-out);
 }
 .hero-box:focus-within {
-  border-color: #6a6a6a;
+  border-color: rgb(var(--cm-accent) / 0.7);
+  box-shadow: var(--shadow-md), 0 0 0 3px rgb(var(--cm-accent) / 0.15);
 }
 .hero-box textarea {
   width: 100%;
@@ -59,10 +80,15 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--action);
-  color: var(--action-text);
+  background: var(--cm-spectrum-soft);
+  color: #101014;
+  box-shadow: var(--cm-spectrum-glow);
   display: grid;
   place-items: center;
+  transition: box-shadow var(--micro) var(--ease), transform var(--press) var(--ease);
+}
+.send-btn:hover:not(:disabled) {
+  box-shadow: var(--cm-spectrum-glow-strong);
 }
 .send-btn:disabled {
   opacity: 0.35;
@@ -107,18 +133,28 @@
   gap: 16px;
 }
 .project-card {
-  border: var(--hair) solid var(--border);
+  border: var(--hair) solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: var(--cm-elev-1);
   cursor: pointer;
   background: var(--surface-raised);
-  transition: border-color 0.15s, transform 0.15s;
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-out), transform var(--cm-dur-micro) var(--cm-ease-out);
 }
 .project-card:hover {
-  border-color: #6a6a6a;
+  border-color: var(--border-hover);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-md);
+}
+@media (prefers-reduced-motion: reduce) {
+  .project-card:hover {
+    transform: none;
+  }
 }
 .project-card .thumb {
   aspect-ratio: 16 / 10;
   overflow: hidden;
-  background: #1a1a1a;
+  background: rgb(var(--cm-surface-1));
 }
 .project-card .thumb img,
 .project-card .thumb video {
@@ -130,7 +166,7 @@
 .thumb-empty {
   width: 100%;
   height: 100%;
-  background: repeating-linear-gradient(45deg, #1b1b1b 0 10px, #1e1e1e 10px 20px);
+  background: repeating-linear-gradient(45deg, rgb(var(--cm-surface-1)) 0 10px, rgb(var(--cm-surface-2)) 10px 20px);
 }
 .project-card .meta {
   display: flex;
@@ -141,7 +177,7 @@
 .project-card h3 {
   margin: 0;
   font-size: 13px;
-  font-weight: 400;
+  font-weight: 600;
   color: var(--text-strong);
   white-space: nowrap;
   overflow: hidden;
@@ -151,4 +187,14 @@
 .project-card small {
   color: var(--text-2);
   font-size: 11px;
+}
+
+
+/* ——— Caramelo · interação (gerado pelo MCP) ——— */
+.hero-box textarea::placeholder {
+  color: rgb(var(--cm-fg-dim));
+}
+
+.hero-box textarea {
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
 }

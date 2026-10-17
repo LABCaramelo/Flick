@@ -64,7 +64,7 @@ function Backdrop({ url }: { url: string }) {
 }
 
 function ObjectMesh({ obj, selected, onSelect }: { obj: StageObject; selected: boolean; onSelect: () => void }) {
-  const color = selected ? '#f9634e' : obj.color;
+  const color = selected ? '#FF701A' : obj.color;
   const common = {
     onPointerDown: (e: { stopPropagation: () => void }) => {
       e.stopPropagation();
@@ -206,9 +206,9 @@ export function Stage3D({
       gl={{ preserveDrawingBuffer: true, antialias: true }}
       camera={{ position: initialPose.position, fov: initialPose.fov, near: 0.05, far: 200 }}
       onPointerMissed={() => onSelect(null)}
-      style={{ background: '#101010' }}
+      style={{ background: '#0A0A0D' }}
     >
-      <color attach="background" args={['#101010']} />
+      <color attach="background" args={['#0A0A0D']} />
       <ambientLight intensity={0.55} />
       <directionalLight position={[4, 8, 6]} intensity={1.6} castShadow shadow-mapSize={[1024, 1024]} />
       <hemisphereLight args={['#dfe7ff', '#3a3026', 0.35]} />
@@ -217,7 +217,7 @@ export function Stage3D({
         <planeGeometry args={[40, 40]} />
         <shadowMaterial opacity={0.35} />
       </mesh>
-      {!capturing && <Grid args={[24, 24]} cellSize={0.5} cellThickness={0.5} sectionSize={2.5} sectionThickness={0.9} cellColor="#3a3a3a" sectionColor="#5a5a5a" fadeDistance={28} infiniteGrid position={[0, 0.002, 0]} />}
+      {!capturing && <Grid args={[24, 24]} cellSize={0.5} cellThickness={0.5} sectionSize={2.5} sectionThickness={0.9} cellColor="#27272F" sectionColor="#3A3A44" fadeDistance={28} infiniteGrid position={[0, 0.002, 0]} />}
       <Objects scene={scene} selectedId={selectedId} onSelect={onSelect} onMove={onMove} capturing={capturing} mode={mode} />
       <OrbitControls makeDefault target={initialPose.target} enabled={!playback} maxPolarAngle={topView ? 0.01 : Math.PI * 0.495} enableRotate={!topView} />
       <Bridge bridgeRef={bridgeRef} />

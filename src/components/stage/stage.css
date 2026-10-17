@@ -155,8 +155,8 @@
   justify-content: center;
   align-items: flex-start;
   padding: 0 10px;
-  background: #d2e2f1;
-  color: #1c0f09;
+  background: rgb(var(--cm-surface-3));
+  color: rgb(var(--cm-fg));
   font-size: 12px;
   border: 1.5px solid transparent;
   text-align: left;
@@ -174,7 +174,7 @@
 .shot-add {
   width: 34px;
   flex: none;
-  border: var(--hair) dashed #555;
+  border: var(--hair) dashed rgb(var(--cm-fg-faint));
   display: grid;
   place-items: center;
   color: var(--text-2);
@@ -217,7 +217,7 @@
 }
 .stage-upload {
   aspect-ratio: 16 / 10;
-  border: var(--hair) dashed #555 !important;
+  border: var(--hair) dashed rgb(var(--cm-fg-faint)) !important;
   align-items: center;
   justify-content: center;
   text-align: center !important;
@@ -225,4 +225,59 @@
 .stage-upload:hover {
   border-color: var(--action) !important;
   color: var(--text) !important;
+}
+
+
+/* ——— Caramelo · interação (gerado pelo MCP) ——— */
+.stage-bar .input:focus-visible {
+  outline: none;
+  border-color: rgb(var(--cm-accent) / 0.7);
+  box-shadow: 0 0 0 3px rgb(var(--cm-accent) / 0.15);
+}
+
+.stage-bar .input::placeholder {
+  color: rgb(var(--cm-fg-dim));
+}
+
+.stage-bar .input {
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
+}
+
+.stage-tabs button {
+  transition: color var(--cm-dur-micro) var(--cm-ease-out), background-color var(--cm-dur-micro) var(--cm-ease-out),
+    border-color var(--cm-dur-micro) var(--cm-ease-out), box-shadow var(--cm-dur-micro) var(--cm-ease-out),
+    transform var(--cm-dur-micro) var(--cm-ease-out);
+}
+
+.stage-tabs button:active {
+  transform: scale(0.97);
+  transition-duration: var(--cm-dur-instant);
+}
+
+.stage-tabs button:focus-visible {
+  outline: none;
+  box-shadow: var(--cm-focus-ring);
+}
+
+.stage-picker-grid button {
+  transition: color var(--cm-dur-micro) var(--cm-ease-out), background-color var(--cm-dur-micro) var(--cm-ease-out),
+    border-color var(--cm-dur-micro) var(--cm-ease-out), box-shadow var(--cm-dur-micro) var(--cm-ease-out),
+    transform var(--cm-dur-micro) var(--cm-ease-out);
+}
+
+.stage-picker-grid button:active {
+  transform: scale(0.97);
+  transition-duration: var(--cm-dur-instant);
+}
+
+.stage-picker-grid button:focus-visible {
+  outline: none;
+  box-shadow: var(--cm-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage-tabs button { transition: none; }
+  .stage-tabs button:active { transform: none; }
+  .stage-picker-grid button { transition: none; }
+  .stage-picker-grid button:active { transform: none; }
 }

@@ -137,3 +137,40 @@
   height: 0;
   pointer-events: none;
 }
+
+
+/* ——— Caramelo · interação (gerado pelo MCP) ——— */
+.memory-card textarea:focus-visible {
+  outline: none;
+  border-color: rgb(var(--cm-accent) / 0.7);
+  box-shadow: 0 0 0 3px rgb(var(--cm-accent) / 0.15);
+}
+
+.memory-card textarea::placeholder {
+  color: rgb(var(--cm-fg-dim));
+}
+
+.memory-card textarea {
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
+}
+
+.story-toolbar .btn {
+  transition: color var(--cm-dur-micro) var(--cm-ease-out), background-color var(--cm-dur-micro) var(--cm-ease-out),
+    border-color var(--cm-dur-micro) var(--cm-ease-out), box-shadow var(--cm-dur-micro) var(--cm-ease-out),
+    transform var(--cm-dur-micro) var(--cm-ease-out);
+}
+
+.story-toolbar .btn:active {
+  transform: scale(0.97);
+  transition-duration: var(--cm-dur-instant);
+}
+
+.story-toolbar .btn:focus-visible {
+  outline: none;
+  box-shadow: var(--cm-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .story-toolbar .btn { transition: none; }
+  .story-toolbar .btn:active { transform: none; }
+}

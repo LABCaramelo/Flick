@@ -1,34 +1,47 @@
+/* App tokens mapped onto the Caramelo roles (material Lumen, dark stage).
+   The --cm-* triplets come from ./caramelo/caramelo.css. */
 :root {
-  --bg: #121212;
-  --surface: #121212;
-  --surface-raised: #1c1c1c;
-  --surface-overlay: #181818;
-  --node-surface: #141414;
-  --hover: rgba(250, 248, 237, 0.05);
-  --highlight: rgba(250, 248, 237, 0.08);
-  --active: rgba(250, 248, 237, 0.1);
-  --border: #3e3e3e;
-  --border-soft: #2a2a2a;
-  --text: #d2d2d2;
-  --text-strong: #f3f1e6;
-  --text-2: rgba(210, 210, 210, 0.5);
-  --text-3: rgba(210, 210, 210, 0.3);
-  --action: #faf8ed;
-  --action-hover: #e8e6d4;
-  --action-text: #121212;
-  --accent: #f9634e;
-  --success: #74a42d;
-  --warning: #f79009;
-  --processing: #5f97b0;
-  --selection: #fff8a7;
-  --focus: #faf8ed;
-  --section-fill: rgba(122, 140, 146, 0.42);
-  --font: 'Jost', system-ui, sans-serif;
-  --mono: 'JetBrains Mono', ui-monospace, monospace;
-  --radius: 2px;
-  --hair: 0.5px;
-  --shadow-md: 0 2px 8px #00000060;
-  --shadow-lg: 0 8px 24px #00000080;
+  --bg: rgb(var(--cm-stage));
+  --surface: rgb(var(--cm-surface-1));
+  --surface-raised: rgb(var(--cm-surface-2));
+  --surface-overlay: rgb(var(--cm-surface-2));
+  --node-surface: rgb(var(--cm-surface-1));
+  --hover: rgb(var(--cm-fg) / 0.05);
+  --highlight: rgb(var(--cm-fg) / 0.08);
+  --active: rgb(var(--cm-fg) / 0.11);
+  --border: rgb(var(--cm-line-strong));
+  --border-soft: rgb(var(--cm-line));
+  --border-hover: rgb(var(--cm-fg-faint));
+  --text: rgb(var(--cm-fg-2));
+  --text-strong: rgb(var(--cm-fg));
+  --text-2: rgb(var(--cm-fg-muted));
+  --text-3: rgb(var(--cm-fg-dim));
+  /* selection, active tools, focus of a node: Caramel solid detail */
+  --action: rgb(var(--cm-accent));
+  --action-hover: rgb(var(--cm-accent-bright));
+  --action-text: rgb(var(--cm-accent-contrast));
+  --accent: rgb(var(--cm-accent));
+  --danger: rgb(var(--cm-danger));
+  --success: rgb(var(--cm-success));
+  --warning: rgb(var(--cm-warning));
+  --processing: rgb(var(--cm-info));
+  --selection: rgb(var(--cm-accent) / 0.35);
+  --focus: rgb(var(--cm-focus));
+  --section-fill: rgb(var(--cm-surface-3) / 0.72);
+  --font: var(--caramelo-font-sans);
+  --font-display: var(--caramelo-font-display);
+  --font-hand: var(--caramelo-font-handwriting);
+  --mono: var(--caramelo-font-mono);
+  --radius: var(--cm-radius-sm);
+  --radius-md: var(--cm-radius-md);
+  --radius-lg: var(--cm-radius-lg);
+  --hair: 1px;
+  --shadow-md: var(--cm-elev-2);
+  --shadow-lg: var(--cm-elev-3);
+  --ease: var(--cm-ease-out);
+  --press: var(--cm-dur-instant);
+  --micro: var(--cm-dur-micro);
+  --quick: var(--cm-dur-quick);
   --topbar-h: 44px;
   --chat-w: 360px;
   color-scheme: dark;
@@ -82,18 +95,15 @@ a {
 
 ::selection {
   background: var(--selection);
-  color: #1c0f09;
+  color: var(--text-strong);
 }
 
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-thumb {
-  background: #333;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
+/* Scrollbars come from caramelo.css (Caramel thumb on surface-2). */
+
+/* keyboard focus on controls: Electric Sky ring (fields use the accent halo instead) */
+:where(a, button, summary, [role='button'], [tabindex]):focus-visible {
+  outline: none;
+  box-shadow: var(--cm-focus-ring);
 }
 
 /* ---------- primitives ---------- */
@@ -111,20 +121,30 @@ a {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   white-space: nowrap;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background-color var(--micro) var(--ease), border-color var(--micro) var(--ease), box-shadow var(--micro) var(--ease), transform var(--press) var(--ease);
 }
 .btn:hover:not(:disabled) {
   background: var(--hover);
-  border-color: #5a5a5a;
+  border-color: var(--border-hover);
 }
+.btn:active:not(:disabled),
+.icon-btn:active:not(:disabled),
+.chip:active,
+.send-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+/* brand CTA: the five-colour spectrum with Ink text (cm-brand-action) */
 .btn-primary {
-  background: var(--action);
-  color: var(--action-text);
-  border-color: var(--action);
+  color: #101014;
+  background: var(--cm-spectrum-soft);
+  border-color: rgb(255 244 232 / 0.3);
+  box-shadow: inset 0 1px 0 #fff4e84d, var(--cm-spectrum-glow);
+  font-weight: 600;
 }
 .btn-primary:hover:not(:disabled) {
-  background: var(--action-hover);
-  border-color: var(--action-hover);
+  background: var(--cm-spectrum-soft);
+  border-color: rgb(255 244 232 / 0.45);
+  box-shadow: inset 0 1px 0 #fff4e84d, var(--cm-spectrum-glow-strong);
 }
 .btn-ghost {
   border-color: transparent;
@@ -139,7 +159,7 @@ a {
   padding: 0;
 }
 .btn-danger {
-  color: var(--accent);
+  color: var(--danger);
 }
 
 .icon-btn {
@@ -150,7 +170,7 @@ a {
   height: 28px;
   border-radius: var(--radius);
   color: var(--text);
-  transition: background 0.15s;
+  transition: background-color var(--micro) var(--ease), color var(--micro) var(--ease), transform var(--press) var(--ease);
 }
 .icon-btn:hover:not(:disabled) {
   background: var(--hover);
@@ -172,9 +192,10 @@ a {
   background: var(--surface-raised);
   white-space: nowrap;
   max-width: 100%;
+  transition: border-color var(--micro) var(--ease), background-color var(--micro) var(--ease), transform var(--press) var(--ease);
 }
 .chip:hover {
-  border-color: #5a5a5a;
+  border-color: var(--border-hover);
 }
 .chip-round {
   border-radius: 999px;
@@ -192,11 +213,17 @@ a {
   padding: 7px 9px;
   outline: none;
   font-size: 13px;
+  transition: border-color var(--micro) var(--ease), box-shadow var(--micro) var(--ease);
 }
 .input:focus,
 .textarea:focus,
 .select:focus {
-  border-color: #6a6a6a;
+  border-color: rgb(var(--cm-accent) / 0.7);
+  box-shadow: 0 0 0 3px rgb(var(--cm-accent) / 0.15);
+}
+.input::placeholder,
+.textarea::placeholder {
+  color: var(--text-3);
 }
 .textarea {
   resize: vertical;
@@ -230,7 +257,7 @@ a {
   width: 14px;
   height: 14px;
   border: 1.5px solid var(--text-3);
-  border-top-color: var(--text);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
   flex: none;
@@ -256,11 +283,13 @@ a {
   z-index: 1000;
   min-width: 190px;
   background: var(--surface-overlay);
-  border: var(--hair) solid var(--border);
+  border: var(--hair) solid var(--border-soft);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
   padding: 4px;
   max-height: 70vh;
   overflow: auto;
+  animation: cm-menu-in var(--quick) var(--cm-ease-drawer);
 }
 .menu-item {
   display: flex;
@@ -272,6 +301,7 @@ a {
   font-size: 13px;
   border-radius: var(--radius);
   white-space: nowrap;
+  transition: background-color var(--micro) var(--ease);
 }
 .menu-item:hover,
 .menu-item.focused {
@@ -294,7 +324,7 @@ a {
 }
 .menu-title {
   padding: 6px 10px 4px;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-2);
@@ -304,8 +334,10 @@ a {
   position: fixed;
   z-index: 2000;
   pointer-events: none;
-  background: #000;
-  color: #eee;
+  background: rgb(var(--cm-surface-3));
+  color: var(--text-strong);
+  border: var(--hair) solid var(--border-soft);
+  box-shadow: var(--shadow-md);
   font-size: 11px;
   padding: 4px 7px;
   border-radius: var(--radius);
@@ -317,16 +349,20 @@ a {
 .modal-scrim {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgb(var(--cm-stage) / 0.72);
+  backdrop-filter: blur(6px);
   z-index: 900;
   display: grid;
   place-items: center;
   padding: 24px;
 }
 .modal {
-  background: var(--surface-raised);
-  border: var(--hair) solid var(--border);
-  box-shadow: var(--shadow-lg);
+  background: var(--surface);
+  border: var(--hair) solid var(--border-soft);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--cm-elev-4);
+  overflow: hidden;
+  animation: cm-modal-in var(--quick) var(--cm-ease-drawer);
   width: min(760px, 100%);
   max-height: calc(100vh - 48px);
   display: flex;
@@ -341,9 +377,11 @@ a {
 }
 .modal-head h2 {
   margin: 0;
-  font-weight: 400;
-  font-size: 16px;
-  letter-spacing: 0.02em;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+  color: var(--text-strong);
 }
 .modal-body {
   padding: 18px;
@@ -365,8 +403,10 @@ a {
 }
 .toast {
   background: var(--surface-overlay);
-  border: var(--hair) solid var(--border);
+  border: var(--hair) solid var(--border-soft);
+  border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
+  animation: cm-pop var(--quick) var(--ease);
   padding: 9px 14px;
   font-size: 13px;
   max-width: 560px;
@@ -375,7 +415,7 @@ a {
   align-items: center;
 }
 .toast.error {
-  border-color: var(--accent);
+  border-color: var(--danger);
 }
 
 /* ---------- top bar ---------- */
@@ -404,12 +444,14 @@ a {
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   text-decoration: none;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  font-size: 13px;
+  font-family: var(--font-display);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  font-size: 16px;
   color: var(--text-strong);
+  border-radius: var(--radius-md);
 }
 .brand svg {
   display: block;
@@ -423,6 +465,7 @@ a {
   max-width: 220px;
   outline: none;
   border-radius: var(--radius);
+  transition: border-color var(--micro) var(--ease), color var(--micro) var(--ease);
 }
 .project-name:hover,
 .project-name:focus {
@@ -443,12 +486,29 @@ a {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  position: relative;
+  transition: color var(--micro) var(--ease);
 }
 .tab:hover {
   color: var(--text);
 }
 .tab.active {
   color: var(--text-strong);
+}
+.tab::after {
+  content: '';
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--cm-spectrum-gradient);
+  transform: scaleX(0);
+  transition: transform var(--quick) var(--cm-ease-drawer);
+}
+.tab.active::after {
+  transform: scaleX(1);
 }
 
 .status-pill {
@@ -497,6 +557,15 @@ a {
   padding: 24px;
 }
 
+.hand-note {
+  font-family: var(--font-hand);
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 1;
+  display: inline-block;
+  transform: rotate(-3deg);
+}
+
 .kbd {
   font-family: var(--mono);
   font-size: 10px;
@@ -527,5 +596,22 @@ a {
   }
   .project-name {
     max-width: 120px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu,
+  .modal,
+  .toast {
+    animation: cm-fade var(--micro) linear;
+  }
+  .tab::after {
+    transition: none;
+  }
+  .btn:active:not(:disabled),
+  .icon-btn:active:not(:disabled),
+  .chip:active,
+  .send-btn:active:not(:disabled) {
+    transform: none;
   }
 }

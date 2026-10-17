@@ -65,7 +65,7 @@
   width: 46px;
   height: 28px;
   flex: none;
-  background: #1d1d1d;
+  background: rgb(var(--cm-surface-1));
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -86,7 +86,7 @@
   display: grid;
   place-items: center;
   padding: 14px;
-  background: #0e0e0e;
+  background: rgb(var(--cm-stage));
 }
 .ed-stage {
   width: 100%;
@@ -115,7 +115,7 @@
   position: relative;
   width: min(100cqw, calc(100cqh * var(--ar, 1.7778)));
   aspect-ratio: var(--ar, 1.7778);
-  background: #000;
+  background: rgb(var(--cm-stage));
   overflow: hidden;
   container-type: size;
 }
@@ -199,7 +199,7 @@
   border-bottom: var(--hair) solid var(--border);
 }
 .export-bar.failed {
-  color: #ff9d8f;
+  color: rgb(var(--cm-danger));
 }
 .export-bar .icon-btn {
   margin-left: auto;
@@ -211,7 +211,7 @@
   flex: none;
   overflow: auto;
   position: relative;
-  background: #0f0f0f;
+  background: rgb(var(--cm-stage));
 }
 .tl-inner {
   position: relative;
@@ -273,7 +273,7 @@
   padding: 5px 0 0 4px;
   font-size: 10px;
   color: var(--text-2);
-  border-left: var(--hair) solid #333;
+  border-left: var(--hair) solid rgb(var(--cm-line-strong));
   font-family: var(--mono);
 }
 .tl-track {
@@ -294,29 +294,31 @@
   cursor: crosshair;
 }
 .tl-track.drop .tl-lane {
-  background: rgba(250, 248, 237, 0.05);
+  background: rgb(var(--cm-fg) / 0.05);
 }
 .tl-clip {
   position: absolute;
   top: 5px;
   bottom: 5px;
-  background-color: #2b3a44;
+  background-color: rgb(var(--cm-surface-3));
   background-size: auto 100%;
   background-repeat: repeat-x;
-  border: 1px solid #44535c;
+  border: 1px solid rgb(var(--cm-line-strong));
+  border-radius: var(--radius);
   overflow: hidden;
   cursor: grab;
 }
 .tl-clip-video {
-  background-color: #263845;
+  background-color: rgb(var(--cm-info-soft));
+  border-color: rgb(37 191 255 / 0.4);
 }
 .tl-clip-audio {
-  background: repeating-linear-gradient(90deg, #2b4a3a 0 2px, #22392d 2px 4px);
-  border-color: #3d6b52;
+  background: repeating-linear-gradient(90deg, rgb(118 87 255 / 0.3) 0 2px, rgb(118 87 255 / 0.14) 2px 4px);
+  border-color: rgb(118 87 255 / 0.55);
 }
 .tl-clip-text {
-  background: #4a3a5c;
-  border-color: #6b5684;
+  background: rgb(var(--cm-danger-soft));
+  border-color: rgb(255 61 141 / 0.5);
 }
 .tl-clip.selected {
   border-color: var(--action);
@@ -336,11 +338,11 @@
   display: block;
   padding: 2px 8px;
   font-size: 10.5px;
-  color: #fff;
+  color: rgb(var(--cm-fg));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  text-shadow: 0 1px 2px #000;
+  text-shadow: 0 1px 2px rgb(var(--cm-stage));
   pointer-events: none;
 }
 .tl-trans {
@@ -348,7 +350,7 @@
   left: 0;
   top: 0;
   bottom: 0;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0.75), transparent);
+  background: linear-gradient(90deg, rgb(var(--cm-stage) / 0.75), transparent);
   pointer-events: none;
 }
 .tl-trim {
@@ -367,7 +369,7 @@
 }
 .tl-clip:hover .tl-trim,
 .tl-clip.selected .tl-trim {
-  background: rgba(250, 248, 237, 0.35);
+  background: rgb(var(--cm-fg) / 0.35);
 }
 .tl-playhead {
   position: absolute;
@@ -387,6 +389,29 @@
   font-size: 9.5px;
   font-family: var(--mono);
   background: var(--accent);
-  color: #fff;
+  color: rgb(var(--cm-fg));
   padding: 1px 0;
+}
+
+
+/* ——— Caramelo · interação (gerado pelo MCP) ——— */
+.ed-tabs button {
+  transition: color var(--cm-dur-micro) var(--cm-ease-out), background-color var(--cm-dur-micro) var(--cm-ease-out),
+    border-color var(--cm-dur-micro) var(--cm-ease-out), box-shadow var(--cm-dur-micro) var(--cm-ease-out),
+    transform var(--cm-dur-micro) var(--cm-ease-out);
+}
+
+.ed-tabs button:active {
+  transform: scale(0.97);
+  transition-duration: var(--cm-dur-instant);
+}
+
+.ed-tabs button:focus-visible {
+  outline: none;
+  box-shadow: var(--cm-focus-ring);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ed-tabs button { transition: none; }
+  .ed-tabs button:active { transform: none; }
 }

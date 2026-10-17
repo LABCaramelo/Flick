@@ -116,7 +116,7 @@
 .msg-body code {
   font-family: var(--mono);
   font-size: 12px;
-  background: #1e1e1e;
+  background: rgb(var(--cm-surface-1));
   padding: 1px 4px;
 }
 .msg-body strong {
@@ -137,7 +137,7 @@
   width: 46px;
   height: 46px;
   border: var(--hair) solid var(--border);
-  background: #1d1d1d;
+  background: rgb(var(--cm-surface-1));
   font-size: 9px;
   color: var(--text-2);
   overflow: hidden;
@@ -158,7 +158,7 @@
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #000;
+  background: rgb(var(--cm-stage));
   display: grid;
   place-items: center;
 }
@@ -175,7 +175,7 @@
   font-size: 12px;
 }
 .tool-card.failed {
-  border-color: rgba(249, 99, 78, 0.6);
+  border-color: rgb(var(--cm-danger) / 0.6);
 }
 .tool-head {
   display: flex;
@@ -198,7 +198,7 @@
 }
 .tool-error {
   padding: 0 9px 8px 30px;
-  color: #ff9d8f;
+  color: rgb(var(--cm-danger));
   font-size: 11.5px;
   white-space: pre-wrap;
 }
@@ -275,4 +275,22 @@
   height: 24px;
   font-size: 11px;
   background: transparent;
+}
+
+
+/* ——— Caramelo · interação (gerado pelo MCP) ——— */
+.input-atts::placeholder {
+  color: rgb(var(--cm-fg-dim));
+}
+
+.input-atts {
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
+}
+
+.chat-input textarea::placeholder {
+  color: rgb(var(--cm-fg-dim));
+}
+
+.chat-input textarea {
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
 }
