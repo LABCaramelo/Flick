@@ -28,7 +28,7 @@ export function applyTemplate(id: string, p: Project) {
     data: {
       status: 'idle',
       user_input_title: 'Primeira imagem',
-      generationSettings: { actionType: 'Image', inputs: { model: 'nano-banana-pro', prompt: 'A lone figure on an empty night train platform, wet concrete reflecting sodium lights, wide shot, 35mm, cinematic noir', aspect_ratio: '16:9' } },
+      generationSettings: { actionType: 'Image', inputs: { model: 'soul-v2', prompt: 'A lone figure on an empty night train platform, wet concrete reflecting sodium lights, wide shot, 35mm, cinematic noir', aspect_ratio: '16:9' } },
     },
   };
   const n2 = note('# 2. Anime em vídeo\n\n- Selecione a imagem pronta\n- Clique em **Vídeo** no menu lateral\n- Descreva o movimento de câmera', 0, 300, 'blue');
@@ -36,7 +36,7 @@ export function applyTemplate(id: string, p: Project) {
     id: uid(),
     type: 'video',
     position: { x: 820, y: 0 },
-    data: { status: 'idle', user_input_title: 'Primeiro plano', generationSettings: { actionType: 'ImageToVideo', inputs: { model: 'kling-3.0', prompt: 'Slow dolly in toward the figure, light rain begins to fall, distant train horn', duration: '5' } } },
+    data: { status: 'idle', user_input_title: 'Primeiro plano', generationSettings: { actionType: 'ImageToVideo', inputs: { model: 'kling-3.0-standard', prompt: 'Slow dolly in toward the figure, light rain begins to fall, distant train horn', duration: '5' } } },
   };
   const n3 = note('# 3. Monte e exporte\n\n- Selecione o vídeo → **Adicionar à Linha do Tempo**\n- Abra o **Editor de Vídeo** e exporte\n\nOu peça tudo ao agente no painel à direita.', 0, 560, 'green');
   for (const n of [n1, img, n2, vid, n3]) p.nodes[n.id] = n;

@@ -342,33 +342,52 @@ const musicDur: ModelSetting = {
   options: ['15', '30', '60', '120'].map((v) => ({ value: v, label: `${v}s` })),
   defaultValue: '30',
 };
+/** native audio costs extra on most video models, so it starts off */
+export const AUDIO_SETTING: ModelSetting = { id: 'audio', label: 'Áudio', type: 'checkbox', defaultValue: false };
 
 const IMAGE_GEN: ActionType[] = ['Image', 'TextToImage'];
 const IMAGE_EDIT: ActionType[] = ['Image', 'EditImage', 'CharacterReference', 'ImageStyleTransfer', 'ChangeAngle', 'ImageInpaint'];
 const I2V: ActionType[] = ['ImageToVideo', 'ReferenceToVideo', 'OmniReference'];
+const videoSettings = (values: number[], def: number) => [videoDur(values, def), videoRes, aspect, AUDIO_SETTING];
 
 /**
- * Fallback catalog used until the provider reports its own model list
- * (Higgsfield's `list_models`). Ids are what we send as `model`.
+ * Model catalog, aligned with flick.art's: ids follow flick's, and only the
+ * flick models that also exist on the Higgsfield API are listed (plus SOUL V2,
+ * Higgsfield's own model, standing in for flick's in-house one). The Higgsfield
+ * API provider maps each id to its endpoints; the offline provider and the MCP
+ * fallback use this list as is. Audio, upscale and background removal have no
+ * Higgsfield API endpoint and run on the Higgsfield MCP.
  */
 export const DEFAULT_MODELS: ModelInfo[] = [
   { id: 'auto', name: 'Auto', description: 'Escolhe o melhor modelo para a tarefa', actions: [...new Set([...IMAGE_GEN, ...IMAGE_EDIT, ...I2V, 'TextToDialog', 'TextToMusic'] as ActionType[])], labels: ['auto'], settings: [aspect] },
-  { id: 'nano-banana-pro', name: 'Nano Banana Pro', description: 'Alta qualidade, 1K–4K, ótima consistência de personagem', actions: [...IMAGE_GEN, ...IMAGE_EDIT], estimatedTime: '~35s', settings: [aspect, imageRes, count] },
-  { id: 'nano-banana', name: 'Nano Banana', description: 'Edição rápida e consistente com linguagem natural', actions: [...IMAGE_GEN, ...IMAGE_EDIT], estimatedTime: '~15s', settings: [aspect, count] },
-  { id: 'seedream-4.5', name: 'Seedream 4.5', description: 'Texto em imagem, layouts e composição multi-imagem', actions: [...IMAGE_GEN, 'EditImage', 'CharacterReference'], estimatedTime: '~30s', settings: [aspect, imageRes, count] },
-  { id: 'soul', name: 'Soul', description: 'Fotorrealismo com estética de moda/cinema', actions: IMAGE_GEN, estimatedTime: '~20s', settings: [aspect, count] },
-  { id: 'gpt-image', name: 'GPT Image', description: 'Forte em texto dentro da imagem e aderência ao prompt', actions: [...IMAGE_GEN, 'EditImage'], estimatedTime: '~60s', settings: [aspect, count] },
-  { id: 'flux-2-pro', name: 'FLUX.2 Pro', description: 'Rápido e versátil', actions: IMAGE_GEN, estimatedTime: '~10s', settings: [aspect, count] },
+  // images
+  { id: 'soul-v2', name: 'Soul V2', description: 'Modelo próprio da Higgsfield: retratos e fotos editoriais; o mais barato', actions: IMAGE_GEN, estimatedTime: '~20s', settings: [aspect, count] },
+  { id: 'gpt-image-2.5', name: 'GPT Image 2.5', description: 'OpenAI: edição precisa e boa aderência ao prompt, até 4K', actions: [...IMAGE_GEN, 'EditImage', 'CharacterReference', 'ImageStyleTransfer'], estimatedTime: '~60s', settings: [aspect, imageRes] },
+  { id: 'gpt-image-2', name: 'GPT Image 2', description: 'OpenAI: texto dentro da imagem e cores neutras', actions: [...IMAGE_GEN, 'EditImage', 'CharacterReference'], estimatedTime: '~60s', settings: [aspect, imageRes] },
+  { id: 'grok-imagine', name: 'Grok Imagine', description: 'xAI: visual estético para cinema, anime e fotorrealismo; gera e edita', actions: [...IMAGE_GEN, 'EditImage', 'CharacterReference'], estimatedTime: '~20s', settings: [aspect] },
+  { id: 'recraft', name: 'Recraft V4.1', description: 'Controle de estilo e textos longos (no flick: Recraft V3)', actions: IMAGE_GEN, estimatedTime: '~20s', settings: [aspect] },
+  { id: 'z-image-turbo', name: 'Z-Image Turbo', description: 'Fotorrealista ultrarrápido, bom com texto', actions: IMAGE_GEN, estimatedTime: '~5s', settings: [aspect] },
+  { id: 'qwen-image-3', name: 'Qwen Image 3', description: 'Edição barata de 1 a 3 imagens, inclusive mudar o ângulo (no flick: Qwen Camera Control)', actions: ['TextToImage', 'EditImage', 'CharacterReference', 'ImageStyleTransfer', 'ChangeAngle', 'ImageInpaint'], estimatedTime: '~30s', settings: [aspect] },
   { id: 'upscale', name: 'Upscale', description: 'Aumento de resolução com recuperação de detalhes', actions: ['ImageUpscale'], settings: [imageRes] },
   { id: 'remove-background', name: 'Remover fundo', actions: ['ImageRemoveBackground'] },
-  { id: 'kling-3.0', name: 'Kling 3.0', description: 'Movimento cinematográfico fluido com áudio nativo', actions: [...I2V, 'MotionToVideo'], estimatedTime: '~2m', labels: ['with-audio'], settings: [videoDur([5, 10], 5), videoRes, aspect] },
-  { id: 'veo-3.1', name: 'Veo 3.1', description: 'Física e realismo superiores, quadro inicial e final', actions: I2V, estimatedTime: '~2m', labels: ['with-audio'], settings: [videoDur([4, 6, 8], 8), videoRes, aspect] },
-  { id: 'seedance-2.0', name: 'Seedance 2.0', description: 'Áudio nativo com lip-sync, até 15s', actions: I2V, estimatedTime: '~2m', labels: ['with-audio'], settings: [videoDur([5, 10, 15], 5), videoRes, aspect] },
-  { id: 'wan-2.6', name: 'Wan 2.6', description: 'Vídeo multi-plano com segmentação de cenas', actions: [...I2V, 'VideoExtension'], estimatedTime: '~90s', settings: [videoDur([5, 10, 15], 5), videoRes, aspect] },
-  { id: 'minimax-hailuo', name: 'MiniMax Hailuo', description: 'Rápido, com controle de quadro inicial/final', actions: I2V, estimatedTime: '~60s', settings: [videoDur([6, 10], 6), videoRes] },
-  { id: 'sora-2', name: 'Sora 2', description: 'Cenas longas e coerentes com som', actions: ['ImageToVideo', 'ReferenceToVideo'], estimatedTime: '~3m', labels: ['with-audio'], settings: [videoDur([4, 8, 12], 8), aspect] },
+  // video
+  { id: 'kling-3.0-standard', name: 'Kling 3.0', description: 'Movimento cinematográfico fluido, quadro inicial e final; o Kling 3.0 mais barato', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10], 5) },
+  { id: 'kling-3.0', name: 'Kling 3.0 Pro', description: 'Versão Pro do Kling 3.0, com mais detalhe', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10], 5) },
+  { id: 'kling-3.0-4k', name: 'Kling 3.0 4K', description: 'Saída nativa em 4K; caro', actions: I2V, estimatedTime: '~3m', labels: ['expensive'], settings: videoSettings([5, 10], 5) },
+  { id: 'kling-o3-standard', name: 'Kling O3', description: 'Consistência de personagens e objetos por referência, 1080p', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10], 5) },
+  { id: 'kling-o3', name: 'Kling O3 Pro', description: 'Versão Pro do O3; também edita vídeos', actions: [...I2V, 'VideoEdit'], estimatedTime: '~3m', settings: videoSettings([5, 10], 5) },
+  { id: 'kling-2.6', name: 'Kling 2.6 Pro', description: 'Movimento cinematográfico e animação de personagens', actions: ['ImageToVideo', 'ReferenceToVideo'], estimatedTime: '~2m', settings: videoSettings([5, 10], 5) },
+  { id: 'kling-2.6-motion', name: 'Kling 2.6 · Movimento', description: 'Transfere o movimento de um vídeo de referência para a imagem', actions: ['MotionToVideo'], estimatedTime: '~2m' },
+  { id: 'kling-2.6-motion-pro', name: 'Kling 2.6 Pro · Movimento', description: 'Mais qualidade para danças e gestos complexos', actions: ['MotionToVideo'], estimatedTime: '~3m' },
+  { id: 'seedance-2.5', name: 'Seedance 2.5', description: 'ByteDance: até 30s, quadro inicial e final, edita e estende vídeos; caro em 720p e 1080p', actions: [...I2V, 'VideoEdit', 'VideoExtension'], estimatedTime: '~3m', labels: ['expensive'], settings: videoSettings([5, 10, 15], 5) },
+  { id: 'seedance-2.0', name: 'Seedance 2.0', description: 'ByteDance: até 15s, com áudio e lip-sync', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10, 15], 5) },
+  { id: 'minimax-h3', name: 'MiniMax H3', description: 'Hailuo 3: vídeo nativo em 2K, quadro inicial e final', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10], 5) },
+  { id: 'wan3.0', name: 'Wan 3.0', description: 'Alibaba: até 30s em 480p/720p/1080p', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10, 15], 5) },
+  { id: 'wan2.6', name: 'Wan 2.6', description: 'Vídeo multi-plano com segmentação de cenas', actions: I2V, estimatedTime: '~90s', settings: videoSettings([5, 10, 15], 5) },
+  { id: 'happy-horse-1.1', name: 'Happy Horse 1.1', description: 'Alibaba: anima o primeiro quadro guiado pelo prompt, 720p/1080p', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10], 5) },
+  { id: 'grok-imagine-video', name: 'Grok Imagine 1.5', description: 'xAI: bom movimento; combina até 7 imagens de referência', actions: I2V, estimatedTime: '~2m', settings: videoSettings([5, 10], 5) },
   { id: 'video-upscale', name: 'Upscale de vídeo', actions: ['VideoUpscale'], settings: [videoRes] },
-  { id: 'video-edit', name: 'Edição de vídeo', actions: ['VideoEdit', 'VideoExtension'] },
+  // audio
   { id: 'sfx', name: 'Efeitos sonoros', actions: ['VideoToAudio'] },
   { id: 'lipsync', name: 'Lip-sync / Avatar', actions: ['AudioToVideo'] },
   { id: 'elevenlabs-v3', name: 'Eleven v3', description: 'Diálogo multi-voz com tags de áudio', actions: ['TextToDialog'], estimatedTime: '~6s' },
@@ -380,25 +399,45 @@ export function modelsForAction(models: ModelInfo[], action: ActionType): ModelI
   return list.length ? list : models.filter((m) => m.id === 'auto');
 }
 
+/** Model by id, also matching aliases (e.g. a raw endpoint saved by an older project). */
+export function findModel(models: ModelInfo[], id: unknown): ModelInfo | undefined {
+  if (typeof id !== 'string' || !id) return undefined;
+  return models.find((m) => m.id === id) ?? models.find((m) => m.aliases?.includes(id));
+}
+
+/** Settings the model offers for `action`. */
+export function modelSettings(model: ModelInfo | undefined, action: ActionType): ModelSetting[] {
+  return model?.settingsByAction?.[action] ?? model?.settings ?? [];
+}
+
+/** Defaults favour the cheapest model that does the job well. */
 export const DEFAULT_MODEL_BY_ACTION: Partial<Record<ActionType, string>> = {
-  Image: 'nano-banana-pro',
-  TextToImage: 'nano-banana-pro',
-  EditImage: 'nano-banana-pro',
-  CharacterReference: 'nano-banana-pro',
-  ImageStyleTransfer: 'nano-banana',
-  ChangeAngle: 'nano-banana',
-  ImageInpaint: 'nano-banana',
+  Image: 'soul-v2',
+  TextToImage: 'soul-v2',
+  EditImage: 'qwen-image-3',
+  CharacterReference: 'qwen-image-3',
+  ImageStyleTransfer: 'qwen-image-3',
+  ChangeAngle: 'qwen-image-3',
+  ImageInpaint: 'qwen-image-3',
   ImageUpscale: 'upscale',
   ImageRemoveBackground: 'remove-background',
-  ImageToVideo: 'kling-3.0',
-  ReferenceToVideo: 'seedance-2.0',
-  OmniReference: 'kling-3.0',
-  MotionToVideo: 'kling-3.0',
-  VideoExtension: 'wan-2.6',
+  ImageToVideo: 'kling-3.0-standard',
+  ReferenceToVideo: 'kling-o3-standard',
+  OmniReference: 'kling-o3-standard',
+  MotionToVideo: 'kling-2.6-motion',
+  VideoExtension: 'seedance-2.5',
   VideoUpscale: 'video-upscale',
-  VideoEdit: 'video-edit',
+  VideoEdit: 'kling-o3',
   VideoToAudio: 'sfx',
   AudioToVideo: 'lipsync',
   TextToDialog: 'elevenlabs-v3',
   TextToMusic: 'elevenlabs-music',
 };
+
+/** Default model id for `action` within `models`. */
+export function defaultModelId(models: ModelInfo[], action: ActionType): string {
+  const list = modelsForAction(models, action);
+  const preferred = DEFAULT_MODEL_BY_ACTION[action];
+  if (preferred && list.some((m) => m.id === preferred)) return preferred;
+  return (list.find((m) => m.id !== 'auto') ?? list[0])?.id ?? 'auto';
+}

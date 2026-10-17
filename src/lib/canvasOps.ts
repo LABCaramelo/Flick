@@ -1,4 +1,4 @@
-import { ACTIONS, DEFAULT_MODEL_BY_ACTION, modelsForAction, pickInputFor } from '../../shared/actions';
+import { ACTIONS, defaultModelId, pickInputFor } from '../../shared/actions';
 import { DEFAULT_MEDIA_WIDTH, nodeSize, nodeTitle, uid } from '../../shared/project';
 import type {
   ActionType,
@@ -20,10 +20,7 @@ const st = () => useProject.getState();
 
 /** Default model for an action from the active provider catalog. */
 export function defaultModelFor(action: ActionType): string {
-  const list = modelsForAction(st().models, action);
-  const preferred = DEFAULT_MODEL_BY_ACTION[action];
-  if (preferred && list.some((m) => m.id === preferred)) return preferred;
-  return (list.find((m) => m.id !== 'auto') ?? list[0])?.id ?? 'auto';
+  return defaultModelId(st().models, action);
 }
 
 export function rectOf(p: Project, n: CanvasNode) {

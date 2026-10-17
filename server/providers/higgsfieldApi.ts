@@ -3,16 +3,17 @@ import os from 'node:os';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import { createHiggsfieldClient, type HiggsfieldClient, type V2Response, AuthenticationError, NotEnoughCreditsError, ValidationError, BadInputError, APIError } from '@higgsfield/client/v2';
-import { ACTIONS } from '../../shared/actions';
-import type { ActionType, GenerateRequest, MediaKind, MediaRef, ModelInfo, ModelSetting, ProviderStatus } from '../../shared/types';
+import { ACTIONS, AUDIO_SETTING, DEFAULT_MODEL_BY_ACTION, DEFAULT_MODELS } from '../../shared/actions';
+import type { ActionType, CostEstimate, GenerateRequest, MediaKind, MediaRef, ModelInfo, ModelSetting, ProviderStatus } from '../../shared/types';
 import { HF_CREDENTIALS } from '../config';
 import { run } from '../media';
-import { ProviderError, type GenerationProvider, type ProviderContext, type RawOutput } from './types';
+import { ProviderError, type EstimateOptions, type GenerationProvider, type ProviderContext, type RawOutput } from './types';
 
 // Generation backend on the official Higgsfield API (SDK @higgsfield/client).
-// The model catalog (endpoint ids + JSON schemas) was extracted from
-// docs.higgsfield.ai; each canvas action lists the endpoints whose schema can
-// serve it, and request bodies are built from those schemas.
+// The endpoint catalog (ids + JSON schemas) was extracted from
+// docs.higgsfield.ai. The UI lists the flick-aligned models of
+// shared/actions.ts; each one maps to the Higgsfield endpoints that serve it,
+// and request bodies are built from those endpoints' schemas.
 
 type Schema = { type?: string; properties?: Record<string, Prop>; required?: string[] };
 type Prop = { type?: string; enum?: unknown[]; default?: unknown; minimum?: number; maximum?: number; items?: Prop; maxItems?: number; format?: string };
@@ -41,22 +42,60 @@ const has = (e: CatalogEntry, ...names: string[]) => names.some((n) => n in prop
 const req = (e: CatalogEntry) => e.schema.required ?? [];
 const wf = (e: CatalogEntry) => `${e.workflow} ${e.endpoint}`;
 
-/** endpoint preference per action (first = default) */
-const PREFERRED: Partial<Record<ActionType, string[]>> = {
-  Image: ['higgsfield-ai/soul/v2/standard', 'alibaba/qwen-image-3/edit', 'xai/grok-imagine-image-2.0'],
-  TextToImage: ['higgsfield-ai/soul/v2/standard', 'higgsfield-ai/soul/cinema'],
-  EditImage: ['alibaba/qwen-image-3/edit', 'xai/grok-imagine-image-2.0'],
-  CharacterReference: ['alibaba/qwen-image-3/edit', 'xai/grok-imagine-image-2.0'],
-  ImageStyleTransfer: ['alibaba/qwen-image-3/edit'],
-  ChangeAngle: ['alibaba/qwen-image-3/edit'],
-  ImageInpaint: ['alibaba/qwen-image-3/edit'],
-  ImageToVideo: ['bytedance/seedance-2.5/image-to-video', 'kling-video/v3.0/pro/image-to-video', 'kling-video/v3.0/std/image-to-video'],
-  ReferenceToVideo: ['bytedance/seedance-2.5/reference-to-video', 'bytedance/seedance-2.5/text-to-video'],
-  OmniReference: ['kling-video/o3/image-reference', 'kling-video/omni/image-reference'],
-  MotionToVideo: ['kling-video/v3/motion-control/std', 'kling-video/v3/motion-control/pro'],
-  VideoEdit: ['bytedance/seedance-2.5/video-edit', 'kling-video/o3/video-edit'],
-  VideoExtension: ['bytedance/seedance-2.5/video-extend'],
+/**
+ * flick-aligned model id -> the Higgsfield endpoints that serve it (in order of
+ * preference per action) and inputs the model pins, e.g. Kling O3 Standard and
+ * Pro share endpoints and differ by `mode`.
+ */
+const ALIGNED: Record<string, { endpoints: string[]; fixed?: Record<string, unknown> }> = {
+  'soul-v2': { endpoints: ['higgsfield-ai/soul/v2/standard'] },
+  'gpt-image-2.5': { endpoints: ['marketing-studio/image/sunburst'] },
+  'gpt-image-2': { endpoints: ['marketing-studio/image'] },
+  'grok-imagine': { endpoints: ['xai/grok-imagine-image-2.0'] },
+  recraft: { endpoints: ['recraft/v4.1/text-to-image'] },
+  'z-image-turbo': { endpoints: ['z-image/turbo'] },
+  'qwen-image-3': { endpoints: ['alibaba/qwen-image-3/edit', 'alibaba/qwen-image-3/text-to-image'] },
+  'kling-3.0-standard': { endpoints: ['kling-video/v3.0/std/image-to-video', 'kling-video/v3.0/std/text-to-video'] },
+  'kling-3.0': { endpoints: ['kling-video/v3.0/pro/image-to-video', 'kling-video/v3.0/pro/text-to-video'] },
+  'kling-3.0-4k': { endpoints: ['kling-video/v3.0/4k/image-to-video', 'kling-video/v3.0/4k/text-to-video'] },
+  'kling-o3-standard': { endpoints: ['kling-video/o3/image-reference', 'kling-video/o3/first-last-frame'], fixed: { mode: 'std' } },
+  'kling-o3': { endpoints: ['kling-video/o3/image-reference', 'kling-video/o3/first-last-frame', 'kling-video/o3/video-edit'], fixed: { mode: 'pro' } },
+  'kling-2.6': { endpoints: ['kling-video/v2.6/pro/image-to-video', 'kling-video/v2.6/pro/text-to-video'] },
+  'kling-2.6-motion': { endpoints: ['kling-video/motion-control/std'] },
+  'kling-2.6-motion-pro': { endpoints: ['kling-video/motion-control/pro'] },
+  'seedance-2.5': {
+    endpoints: [
+      'bytedance/seedance-2.5/image-to-video',
+      'bytedance/seedance-2.5/reference-to-video',
+      'bytedance/seedance-2.5/text-to-video',
+      'bytedance/seedance-2.5/video-edit',
+      'bytedance/seedance-2.5/video-extend',
+    ],
+  },
+  'seedance-2.0': { endpoints: ['bytedance/seedance-2.0/image-to-video', 'bytedance/seedance-2.0/reference-to-video', 'bytedance/seedance-2.0/text-to-video'] },
+  'minimax-h3': { endpoints: ['minimax/h3/image-to-video', 'minimax/h3/reference-to-video', 'minimax/h3/text-to-video'] },
+  'wan3.0': { endpoints: ['alibaba/wan-3.0/image-to-video', 'alibaba/wan-3.0/reference-to-video', 'alibaba/wan-3.0/text-to-video'] },
+  'wan2.6': { endpoints: ['wan/v2.6/image-to-video', 'wan/v2.6/reference-to-video', 'wan/v2.6/text-to-video'] },
+  'happy-horse-1.1': { endpoints: ['alibaba/happy-horse/v1.1/image-to-video', 'alibaba/happy-horse/v1.1/reference-to-video', 'alibaba/happy-horse/v1.1/text-to-video'] },
+  'grok-imagine-video': { endpoints: ['xai/grok-imagine-video/v1.5/reference-to-video'] },
 };
+
+const BY_ENDPOINT = new Map(CATALOG.map((e) => [e.endpoint, e]));
+const alignedEntries = (id: string): CatalogEntry[] => (ALIGNED[id]?.endpoints ?? []).flatMap((ep) => BY_ENDPOINT.get(ep) ?? []);
+const needsMedia = (e: CatalogEntry) => req(e).some((r) => /image|video|frame/.test(r));
+
+/** endpoint of an aligned model for `action`; prompt-only requests prefer endpoints that need no media */
+function endpointFor(modelId: string, action: ActionType, hasImage = true): CatalogEntry | undefined {
+  const list = alignedEntries(modelId).filter((e) => supports(action, e));
+  return list.find((e) => hasImage || !needsMedia(e)) ?? list[0];
+}
+
+/** model used when the request names none (or an unknown one) */
+function defaultAlignedFor(action: ActionType): string | undefined {
+  const preferred = DEFAULT_MODEL_BY_ACTION[action];
+  if (preferred && endpointFor(preferred, action)) return preferred;
+  return DEFAULT_MODELS.find((m) => ALIGNED[m.id] && endpointFor(m.id, action))?.id;
+}
 
 function supports(action: ActionType, e: CatalogEntry): boolean {
   const w = wf(e);

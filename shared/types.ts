@@ -360,8 +360,26 @@ export interface ModelInfo {
   labels?: string[];
   aspectRatios?: string[];
   settings?: ModelSetting[];
+  /** per-action settings, when one model runs on several endpoints with different options */
+  settingsByAction?: Partial<Record<ActionType, ModelSetting[]>>;
+  /** other ids that resolve to this model (e.g. raw provider endpoints saved by older projects) */
+  aliases?: string[];
   /** raw id understood by the provider, when different from id */
   providerModel?: string;
+}
+
+export interface CostEstimate {
+  /** expected charge in USD, after the account discount when known; null when unknown */
+  usd: number | null;
+  /** quote: provider's estimate endpoint · formula: provider's published rate · free: nothing is charged */
+  source: 'quote' | 'formula' | 'free' | 'unknown';
+  /** price before the discount */
+  listUsd?: number;
+  discountPct?: number;
+  /** short explanation shown on hover (pt-BR) */
+  note?: string;
+  /** provider endpoint that will run */
+  endpoint?: string;
 }
 
 export interface ProviderStatus {
