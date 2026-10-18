@@ -21,8 +21,19 @@ import { nodeTitle, uid } from '../../../shared/project';
 import { findStyle } from '../../../shared/styles';
 import type { AgentStreamEvent, ChatMessageView, ChatThreadSummary, MediaNode, ToolCardState } from '../../../shared/types';
 import { api, streamAgent } from '../../lib/api';
-import { TOOL_LABELS, canvasSummary, describeToolArgs, executeAgentTool, type ToolResult } from '../../lib/agentTools';
+import {
+  TOOL_LABELS,
+  canvasSummary,
+  describeToolArgs,
+  discardPlannedGeneration,
+  executeAgentTool,
+  isGenerationTool,
+  planAgentGeneration,
+  runPlannedGeneration,
+  type ToolResult,
+} from '../../lib/agentTools';
 import { pickFiles, uploadFilesToCanvas, zoomToFit } from '../../lib/canvasOps';
+import { costPhrase, estimateGenerations, formatUsd, getAgentBudget, overBudgetReason, roundUsd, sumEstimates } from '../../lib/cost';
 import { useSpeech } from '../../lib/speech';
 import { onAskAgent } from '../../lib/events';
 import { useProject, type View } from '../../store/project';
@@ -61,6 +72,8 @@ export function ChatPanel({ view }: { view: View }) {
   const taRef = useRef<HTMLTextAreaElement>(null);
   const runIdRef = useRef<string | undefined>(undefined);
   const approvals = useRef(new Map<string, (ok: boolean) => void>());
+  // estimated spend of the current response, started or awaiting approval (Auto mode limit)
+  const spentRef = useRef(0);
   const speech = useSpeech((t) => setInput((v) => (v ? `${v} ${t}` : t)));
 
   const loadThreads = useCallback(() => api.threads(projectId).then(setThreads).catch(() => undefined), [projectId]);
@@ -133,23 +146,59 @@ export function ChatPanel({ view }: { view: View }) {
     patchAssistant(msgId, (m) => ({ ...m, tools: (m.tools ?? []).map((t) => (t.callId === callId ? { ...t, ...patch } : t)) }));
 
   async function handleToolCall(msgId: string, ev: Extract<AgentStreamEvent, { type: 'tool_call' }>) {
-    if (ev.needsApproval) {
-      const ok = await new Promise<boolean>((resolve) => approvals.current.set(ev.callId, resolve));
-      approvals.current.delete(ev.callId);
-      if (!ok) {
-        patchTool(msgId, ev.callId, { status: 'rejected' });
-        await api.toolResult(runIdRef.current!, ev.callId, { ok: false, rejected: true, error: 'o usuário recusou esta geração' }).catch(() => undefined);
-        return;
-      }
-      patchTool(msgId, ev.callId, { status: 'running' });
-    }
+    const runId = runIdRef.current!;
     let result: ToolResult;
     try {
-      result = await executeAgentTool(ev.name, ev.args);
+      result = isGenerationTool(ev.name) ? await priceAndGenerate(runId, msgId, ev) : await executeAgentTool(ev.name, ev.args);
     } catch (e) {
       result = { ok: false, error: String((e as Error).message ?? e) };
     }
-    await api.toolResult(runIdRef.current!, ev.callId, result).catch(() => undefined);
+    await api.toolResult(runId, ev.callId, result).catch(() => undefined);
+  }
+
+  /** Lays the nodes out, prices them, waits for approval when needed, then generates. */
+  async function priceAndGenerate(runId: string, msgId: string, ev: Extract<AgentStreamEvent, { type: 'tool_call' }>): Promise<ToolResult> {
+    const plan = planAgentGeneration(ev.name, ev.args);
+    if ('error' in plan) return { ok: false, error: plan.error };
+    patchTool(msgId, ev.callId, { estimating: true, nodeIds: plan.nodeIds });
+    const prices = await estimateGenerations(plan.nodeIds);
+    if (runIdRef.current !== runId) {
+      // stopped while pricing: nothing left to approve
+      discardPlannedGeneration(plan);
+      patchTool(msgId, ev.callId, { estimating: false, status: 'rejected', nodeIds: undefined });
+      return { ok: false, rejected: true, error: 'cancelado pelo usuário' };
+    }
+    const priced = Object.values(prices);
+    const cost = priced.length ? sumEstimates(priced) : undefined;
+    // Auto asks too when the response would pass the limit or the price is unknown
+    const reason = cost && approval === 'auto' ? overBudgetReason(cost, spentRef.current, getAgentBudget()) : undefined;
+    const ask = ev.needsApproval || !!reason;
+    // reserved before any await, so parallel calls count each other
+    const reserved = cost?.usd ?? 0;
+    spentRef.current = roundUsd(spentRef.current + reserved);
+    patchTool(msgId, ev.callId, { estimating: false, cost: cost && { ...cost, reason, responseUsd: spentRef.current }, status: ask ? 'pending_approval' : 'running' });
+
+    if (ask) {
+      const ok = await new Promise<boolean>((resolve) => approvals.current.set(ev.callId, resolve));
+      approvals.current.delete(ev.callId);
+      if (!ok) {
+        spentRef.current = roundUsd(spentRef.current - reserved);
+        discardPlannedGeneration(plan);
+        patchTool(msgId, ev.callId, { status: 'rejected', nodeIds: undefined });
+        return {
+          ok: false,
+          rejected: true,
+          error: `o usuário recusou esta geração${cost ? ` (${costPhrase(cost)})` : ''}`,
+          cost: cost && { ...cost, responseUsd: spentRef.current },
+        };
+      }
+      patchTool(msgId, ev.callId, { status: 'running' });
+    }
+
+    const result = await runPlannedGeneration(plan, prices);
+    // nodes refused before submission cost nothing: keep only what was sent
+    spentRef.current = roundUsd(spentRef.current + (result.cost?.usd ?? 0) - reserved);
+    return result.cost ? { ...result, cost: { ...result.cost, responseUsd: spentRef.current } } : result;
   }
 
   async function send(text: string, fromHome = false) {
@@ -167,6 +216,8 @@ export function ChatPanel({ view }: { view: View }) {
     st.setChatAttachments([]);
     const controller = new AbortController();
     setRunning({ controller });
+    spentRef.current = 0;
+    const budgetUsd = getAgentBudget();
     let msgId = placeholder.id;
     const style = findStyle(p.projectSettings.styleId, p.customStyles);
     try {
@@ -185,6 +236,7 @@ export function ChatPanel({ view }: { view: View }) {
             selectedNodeIds: atts.map((a) => a.nodeId),
             view: VIEW_LABEL[view],
             approvalMode: approval,
+            budgetUsd,
           },
         },
         (ev) => {
@@ -207,7 +259,13 @@ export function ChatPanel({ view }: { view: View }) {
               handleToolCall(msgId, ev);
               break;
             case 'tool_result':
-              patchTool(msgId, ev.callId, { status: ev.ok ? 'done' : 'failed', summary: ev.summary, error: ev.error, nodeIds: ev.nodeIds });
+              patchTool(msgId, ev.callId, {
+                status: ev.rejected ? 'rejected' : ev.ok ? 'done' : 'failed',
+                summary: ev.summary,
+                error: ev.error,
+                nodeIds: ev.nodeIds,
+                ...(ev.cost ? { cost: ev.cost } : {}),
+              });
               break;
             case 'suggestions':
               patchAssistant(msgId, (m) => ({ ...m, suggestions: ev.suggestions }));
@@ -486,8 +544,8 @@ export function ChatPanel({ view }: { view: View }) {
         <Popover anchor={approvalMenu} onClose={() => setApprovalMenu(null)} width={260}>
           {(
             [
-              ['auto', 'Auto', 'O agente gera direto, sem pedir confirmação.'],
-              ['ask', 'Perguntar', 'Cada geração (que consome créditos) espera sua aprovação.'],
+              ['auto', 'Auto', `O agente gera direto. Pede confirmação acima de ${formatUsd(getAgentBudget())} por resposta ou sem estimativa de custo.`],
+              ['ask', 'Perguntar', 'Cada geração (que consome créditos) espera sua aprovação, com o custo estimado.'],
             ] as const
           ).map(([v, l, d]) => (
             <button
@@ -529,18 +587,30 @@ function ToolCard({ tool, onSelect, onApprove }: { tool: ToolCardState; onSelect
           {tool.status === 'failed' && ' · Falhou'}
           {tool.status === 'rejected' && ' · Recusado'}
         </span>
+        {tool.estimating ? (
+          <span className="tool-cost muted">Calculando custo…</span>
+        ) : (
+          tool.cost && (
+            <span className="tool-cost" title={tool.cost.title || undefined}>
+              {tool.cost.label}
+            </span>
+          )
+        )}
         <ChevronDown size={12} style={{ transform: open ? 'rotate(180deg)' : undefined }} />
       </button>
       {detail && <div className="tool-detail">{detail}</div>}
       {tool.status === 'pending_approval' && (
-        <div className="tool-approve">
-          <button className="btn btn-sm btn-primary" onClick={() => onApprove(true)}>
-            Aprovar
-          </button>
-          <button className="btn btn-sm" onClick={() => onApprove(false)}>
-            Recusar
-          </button>
-        </div>
+        <>
+          {tool.cost?.reason && <div className="tool-reason">{tool.cost.reason}</div>}
+          <div className="tool-approve">
+            <button className="btn btn-sm btn-primary" disabled={tool.estimating} onClick={() => onApprove(true)}>
+              Aprovar
+            </button>
+            <button className="btn btn-sm" disabled={tool.estimating} onClick={() => onApprove(false)}>
+              Recusar
+            </button>
+          </div>
+        </>
       )}
       {tool.error && <div className="tool-error">{tool.error}</div>}
       {open && (

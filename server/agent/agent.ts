@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import type { Response } from 'express';
 import OpenAI from 'openai';
 import { uid } from '../../shared/project';
-import type { AgentStreamEvent, ChatMessageView, ChatThread, ToolCardState } from '../../shared/types';
+import type { AgentStreamEvent, ChatMessageView, ChatThread, ToolCardState, ToolCost } from '../../shared/types';
 import { OPENAI_API_KEY, OPENAI_BASE_URL, OPENAI_MODEL } from '../config';
 import { resolveMediaUrl } from '../media';
 import { readChat, writeChat } from '../storage';
@@ -27,6 +27,8 @@ export interface ToolResultPayload {
   data?: unknown;
   imageUrl?: string;
   rejected?: boolean;
+  /** estimated charge of the generations this call started (or the user declined) */
+  cost?: ToolCost;
 }
 
 interface Run {
@@ -206,7 +208,8 @@ export async function runAgent(req: ChatRequest, res: Response): Promise<void> {
           card.summary = result.summary;
           card.error = result.error;
           card.nodeIds = result.nodeIds;
-          send({ type: 'tool_result', callId: c.id, ok: result.ok, summary: result.summary, error: result.error, nodeIds: result.nodeIds });
+          card.cost = result.cost;
+          send({ type: 'tool_result', callId: c.id, ok: result.ok, rejected: result.rejected, summary: result.summary, error: result.error, nodeIds: result.nodeIds, cost: result.cost });
           if (result.imageUrl) {
             const uri = await visionDataUri(result.imageUrl);
             if (uri) followUps.push({ role: 'user', content: [{ type: 'text', text: `Imagem do nó ${String(args.node_id ?? '')} para inspeção:` }, { type: 'image_url', image_url: { url: uri, detail: 'high' } }] });

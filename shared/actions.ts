@@ -281,6 +281,9 @@ export const ACTIONS: Record<ActionType, ActionDef> = {
 
 export const ACTION_LIST: ActionDef[] = Object.values(ACTIONS);
 
+/** Agent tools that start generations, which cost money: they are priced and may need approval. */
+export const AGENT_GENERATION_TOOLS: readonly string[] = ['generate_images', 'image_edit', 'image_to_video', 'run_action', 'generate_dialog', 'generate_music'];
+
 export function actionsForOutput(kind: MediaKind): ActionDef[] {
   return ACTION_LIST.filter((a) => a.output === kind);
 }

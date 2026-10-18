@@ -1,5 +1,5 @@
 import type OpenAI from 'openai';
-import { ACTIONS } from '../../shared/actions';
+import { ACTIONS, AGENT_GENERATION_TOOLS } from '../../shared/actions';
 
 // Function-calling surface of the agent. Names follow the tool names found
 // in flick.art's client (generate_images, image_edit, image_to_video,
@@ -15,7 +15,7 @@ const fn = (name: string, description: string, properties: Record<string, unknow
 const str = (description: string) => ({ type: 'string', description });
 const strArr = (description: string) => ({ type: 'array', items: { type: 'string' }, description });
 
-export const GENERATION_TOOLS = new Set(['generate_images', 'image_edit', 'image_to_video', 'run_action', 'generate_dialog', 'generate_music']);
+export const GENERATION_TOOLS = new Set(AGENT_GENERATION_TOOLS);
 /** handled by the server itself, never sent to the client */
 export const SERVER_TOOLS = new Set(['suggest_next_steps', 'let_user_choose']);
 

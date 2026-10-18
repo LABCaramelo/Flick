@@ -49,6 +49,25 @@
   align-items: flex-start;
   gap: 12px;
 }
+.budget-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: var(--hair) solid var(--border-soft);
+}
+.budget-input {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.budget-input .input {
+  width: 88px;
+  font-variant-numeric: tabular-nums;
+}
 .warn {
   display: flex;
   gap: 6px;
@@ -114,5 +133,19 @@ details summary {
 }
 
 .provider-card input {
+  transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
+}
+
+.budget-input .input:focus-visible {
+  outline: none;
+  border-color: rgb(var(--cm-accent) / 0.7);
+  box-shadow: 0 0 0 3px rgb(var(--cm-accent) / 0.15);
+}
+
+.budget-input .input::placeholder {
+  color: rgb(var(--cm-fg-dim));
+}
+
+.budget-input .input {
   transition: border-color var(--cm-dur-micro) var(--cm-ease-standard), box-shadow var(--cm-dur-micro) var(--cm-ease-standard);
 }

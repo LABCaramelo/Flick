@@ -1,7 +1,7 @@
-import { ACTIONS } from '../../shared/actions';
+import { ACTIONS, AGENT_GENERATION_TOOLS } from '../../shared/actions';
 import { DEFAULT_MEDIA_WIDTH, nodeTitle, timelineDuration } from '../../shared/project';
 import { findStyle } from '../../shared/styles';
-import type { ActionType, JobState, MediaNode, NoteColor, Project, TextNode, Vec2 } from '../../shared/types';
+import type { ActionType, CostEstimate, JobState, MediaNode, NoteColor, Project, TextNode, ToolCost, Vec2 } from '../../shared/types';
 import { getProject, useProject } from '../store/project';
 import {
   addNodesToTimeline,
@@ -9,11 +9,13 @@ import {
   createMediaNode,
   createSection,
   createTextNode,
+  deleteNodes,
   findFreeSpot,
   organizeCanvas,
   viewportCenter,
   zoomToFit,
 } from './canvasOps';
+import { costPhrase, sumEstimates } from './cost';
 import { generateAndWait } from './generation';
 import { appendMarkdown, docToMarkdown, markdownToDoc } from './markdown';
 
@@ -28,6 +30,7 @@ export interface ToolResult {
   data?: unknown;
   imageUrl?: string;
   rejected?: boolean;
+  cost?: ToolCost;
 }
 
 export const TOOL_LABELS: Record<string, string> = {
@@ -133,23 +136,29 @@ function growSection(sectionId: string | undefined, ids: string[]) {
   );
 }
 
-async function runAll(ids: string[], timeoutMs: number): Promise<ToolResult> {
+/** Generates the nodes; `prices` (from estimateGenerations) tags each one with its estimated cost. */
+async function runAll(ids: string[], timeoutMs: number, prices: Record<string, CostEstimate>): Promise<ToolResult> {
   const results = await Promise.allSettled(ids.map((id) => generateAndWait(id, timeoutMs)));
   const lines: string[] = [];
+  const submitted: CostEstimate[] = [];
   let alive = 0; // finished or still running
   results.forEach((r, i) => {
     const id = ids[i];
     if (r.status === 'rejected') {
+      // refused before reaching the provider: nothing was charged
       lines.push(`${id}: erro — ${r.reason?.message ?? r.reason}`);
       return;
     }
+    const price = prices[id];
+    if (price) submitted.push(price);
     const j: JobState = r.value;
     if (j.status !== 'failed') alive++;
-    lines.push(`${id}: ${j.status === 'completed' ? 'pronto' : j.status === 'failed' ? `falhou — ${j.error}` : `ainda gerando (${j.progress}%)`}`);
+    const status = j.status === 'completed' ? 'pronto' : j.status === 'failed' ? `falhou — ${j.error}` : `ainda gerando (${j.progress}%)`;
+    lines.push(`${id}: ${status}${price ? ` · ${costPhrase(price)}` : ''}`);
   });
   zoomToFit(ids);
   const summary = lines.join('\n');
-  return { ok: alive > 0, summary, nodeIds: ids, error: alive > 0 ? undefined : summary };
+  return { ok: alive > 0, summary, nodeIds: ids, error: alive > 0 ? undefined : summary, cost: submitted.length ? sumEstimates(submitted) : undefined };
 }
 
 function createGenerator(kind: 'image' | 'video' | 'audio', actionType: ActionType, opts: { prompt?: string; title?: string; model?: string; settings?: Record<string, unknown>; sectionId?: string; position: Vec2 }) {
@@ -165,10 +174,123 @@ function createGenerator(kind: 'image' | 'video' | 'audio', actionType: ActionTy
   });
 }
 
+export const isGenerationTool = (name: string) => AGENT_GENERATION_TOOLS.includes(name);
+
+/** Nodes a generation tool laid out, not generated yet: they are priced and approved first. */
+export interface PlannedGeneration {
+  nodeIds: string[];
+  timeoutMs: number;
+}
+
+/** Lays out the nodes of a generation tool call without generating them. */
+export function planAgentGeneration(name: string, args: Record<string, unknown>): PlannedGeneration | { error: string } {
+  const p = getProject();
+  if (!p) return { error: 'nenhum projeto aberto' };
+
+  switch (name) {
+    case 'generate_images': {
+      const items = (Array.isArray(args.images) ? args.images : []) as { prompt?: string; title?: string; reference_node_ids?: string[] }[];
+      if (!items.length) return { error: 'nenhuma imagem pedida' };
+      const sectionId = str(args.section_id) && p.sections[str(args.section_id)] ? str(args.section_id) : undefined;
+      const place = placer(sectionId);
+      const ids: string[] = [];
+      for (const it of items.slice(0, 8)) {
+        const id = createGenerator('image', 'Image', {
+          prompt: it.prompt,
+          title: it.title,
+          model: str(args.model),
+          settings: args.aspect_ratio ? { aspect_ratio: str(args.aspect_ratio) } : undefined,
+          sectionId,
+          position: place(),
+        });
+        for (const ref of arr(it.reference_node_ids)) if (getProject()!.nodes[ref]) connect(ref, id, 'referenceImages');
+        ids.push(id);
+      }
+      growSection(sectionId, ids);
+      return { nodeIds: ids, timeoutMs: 4 * 60_000 };
+    }
+
+    case 'image_edit': {
+      const sources = arr(args.source_node_ids).filter((id) => p.nodes[id]?.type === 'image');
+      if (!sources.length) return { error: 'nenhuma imagem de origem válida' };
+      const src = p.nodes[sources[0]];
+      const pos = findFreeSpot({ x: src.position.x + 440, y: src.position.y }, DEFAULT_MEDIA_WIDTH, 210);
+      const id = createGenerator('image', 'EditImage', { prompt: str(args.prompt), title: str(args.title), model: str(args.model), sectionId: src.sectionId ?? undefined, position: pos });
+      sources.forEach((s) => connect(s, id, 'referenceImages'));
+      return { nodeIds: [id], timeoutMs: 4 * 60_000 };
+    }
+
+    case 'image_to_video': {
+      const start = str(args.start_frame_node_id);
+      if (p.nodes[start]?.type !== 'image') return { error: 'quadro inicial inválido' };
+      const src = p.nodes[start];
+      const pos = findFreeSpot({ x: src.position.x + 440, y: src.position.y }, DEFAULT_MEDIA_WIDTH, 210);
+      const id = createGenerator('video', 'ImageToVideo', {
+        prompt: str(args.prompt),
+        title: str(args.title),
+        model: str(args.model),
+        settings: args.duration ? { duration: str(args.duration) } : undefined,
+        sectionId: src.sectionId ?? undefined,
+        position: pos,
+      });
+      connect(start, id, 'startFrame');
+      const end = str(args.end_frame_node_id);
+      if (end && p.nodes[end]?.type === 'image') connect(end, id, 'endFrame');
+      return { nodeIds: [id], timeoutMs: 3 * 60_000 };
+    }
+
+    case 'run_action': {
+      const actionType = str(args.action_type) as ActionType;
+      const action = ACTIONS[actionType];
+      if (!action) return { error: `ação desconhecida: ${actionType}` };
+      const inputs = (args.inputs ?? {}) as Record<string, unknown>;
+      const firstSrc = Object.values(inputs).flatMap(arr).map((id) => p.nodes[id]).find(Boolean);
+      const pos = firstSrc ? findFreeSpot({ x: firstSrc.position.x + 440, y: firstSrc.position.y }, DEFAULT_MEDIA_WIDTH, 210) : placer()();
+      const id = createGenerator(action.output, actionType, {
+        prompt: str(args.prompt),
+        title: str(args.title),
+        model: str(args.model),
+        settings: (args.settings as Record<string, unknown>) ?? undefined,
+        sectionId: firstSrc?.sectionId ?? undefined,
+        position: pos,
+      });
+      for (const [inputId, ids] of Object.entries(inputs)) for (const src of arr(ids)) if (getProject()!.nodes[src]) connect(src, id, inputId);
+      return { nodeIds: [id], timeoutMs: 4 * 60_000 };
+    }
+
+    case 'generate_dialog':
+    case 'generate_music': {
+      const music = name === 'generate_music';
+      const id = createGenerator('audio', music ? 'TextToMusic' : 'TextToDialog', {
+        prompt: str(music ? args.prompt : args.text),
+        title: str(args.title) || (music ? 'Trilha' : 'Fala'),
+        settings: music && args.duration ? { duration: str(args.duration) } : undefined,
+        position: placer()(120),
+      });
+      return { nodeIds: [id], timeoutMs: 3 * 60_000 };
+    }
+
+    default:
+      return { error: `ferramenta de geração desconhecida: ${name}` };
+  }
+}
+
+/** Generates what planAgentGeneration laid out; the result reports each generation's estimated cost. */
+export function runPlannedGeneration(plan: PlannedGeneration, prices: Record<string, CostEstimate>): Promise<ToolResult> {
+  return runAll(plan.nodeIds, plan.timeoutMs, prices);
+}
+
+/** The user declined: take the planned nodes off the canvas. */
+export function discardPlannedGeneration(plan: PlannedGeneration) {
+  deleteNodes(plan.nodeIds.filter((id) => getProject()?.nodes[id]));
+}
+
+/** Tools that don't generate. Generation tools go through planAgentGeneration, so they are priced first. */
 export async function executeAgentTool(name: string, args: Record<string, unknown>): Promise<ToolResult> {
   const st = useProject.getState();
   const p = st.project;
   if (!p) return { ok: false, error: 'nenhum projeto aberto' };
+  if (isGenerationTool(name)) return { ok: false, error: `${name} precisa ser orçada antes de gerar` };
 
   switch (name) {
     case 'get_canvas_state':
@@ -195,88 +317,6 @@ export async function executeAgentTool(name: string, args: Record<string, unknow
       const ids = arr(args.node_ids).filter((id) => p.nodes[id]);
       const id = createSection(str(args.label) || undefined, ids);
       return { ok: true, data: { sectionId: id }, summary: `seção ${id} criada` };
-    }
-
-    case 'generate_images': {
-      const items = (Array.isArray(args.images) ? args.images : []) as { prompt?: string; title?: string; reference_node_ids?: string[] }[];
-      if (!items.length) return { ok: false, error: 'nenhuma imagem pedida' };
-      const sectionId = str(args.section_id) && p.sections[str(args.section_id)] ? str(args.section_id) : undefined;
-      const place = placer(sectionId);
-      const ids: string[] = [];
-      for (const it of items.slice(0, 8)) {
-        const id = createGenerator('image', 'Image', {
-          prompt: it.prompt,
-          title: it.title,
-          model: str(args.model),
-          settings: args.aspect_ratio ? { aspect_ratio: str(args.aspect_ratio) } : undefined,
-          sectionId,
-          position: place(),
-        });
-        for (const ref of arr(it.reference_node_ids)) if (getProject()!.nodes[ref]) connect(ref, id, 'referenceImages');
-        ids.push(id);
-      }
-      growSection(sectionId, ids);
-      return runAll(ids, 4 * 60_000);
-    }
-
-    case 'image_edit': {
-      const sources = arr(args.source_node_ids).filter((id) => p.nodes[id]?.type === 'image');
-      if (!sources.length) return { ok: false, error: 'nenhuma imagem de origem válida' };
-      const src = p.nodes[sources[0]];
-      const pos = findFreeSpot({ x: src.position.x + 440, y: src.position.y }, DEFAULT_MEDIA_WIDTH, 210);
-      const id = createGenerator('image', 'EditImage', { prompt: str(args.prompt), title: str(args.title), model: str(args.model), sectionId: src.sectionId ?? undefined, position: pos });
-      sources.forEach((s) => connect(s, id, 'referenceImages'));
-      return runAll([id], 4 * 60_000);
-    }
-
-    case 'image_to_video': {
-      const start = str(args.start_frame_node_id);
-      if (p.nodes[start]?.type !== 'image') return { ok: false, error: 'quadro inicial inválido' };
-      const src = p.nodes[start];
-      const pos = findFreeSpot({ x: src.position.x + 440, y: src.position.y }, DEFAULT_MEDIA_WIDTH, 210);
-      const id = createGenerator('video', 'ImageToVideo', {
-        prompt: str(args.prompt),
-        title: str(args.title),
-        model: str(args.model),
-        settings: args.duration ? { duration: str(args.duration) } : undefined,
-        sectionId: src.sectionId ?? undefined,
-        position: pos,
-      });
-      connect(start, id, 'startFrame');
-      const end = str(args.end_frame_node_id);
-      if (end && p.nodes[end]?.type === 'image') connect(end, id, 'endFrame');
-      return runAll([id], 3 * 60_000);
-    }
-
-    case 'run_action': {
-      const actionType = str(args.action_type) as ActionType;
-      const action = ACTIONS[actionType];
-      if (!action) return { ok: false, error: `ação desconhecida: ${actionType}` };
-      const inputs = (args.inputs ?? {}) as Record<string, unknown>;
-      const firstSrc = Object.values(inputs).flatMap(arr).map((id) => p.nodes[id]).find(Boolean);
-      const pos = firstSrc ? findFreeSpot({ x: firstSrc.position.x + 440, y: firstSrc.position.y }, DEFAULT_MEDIA_WIDTH, 210) : placer()();
-      const id = createGenerator(action.output, actionType, {
-        prompt: str(args.prompt),
-        title: str(args.title),
-        model: str(args.model),
-        settings: (args.settings as Record<string, unknown>) ?? undefined,
-        sectionId: firstSrc?.sectionId ?? undefined,
-        position: pos,
-      });
-      for (const [inputId, ids] of Object.entries(inputs)) for (const src of arr(ids)) if (getProject()!.nodes[src]) connect(src, id, inputId);
-      return runAll([id], 4 * 60_000);
-    }
-
-    case 'generate_dialog':
-    case 'generate_music': {
-      const music = name === 'generate_music';
-      const id = createGenerator('audio', music ? 'TextToMusic' : 'TextToDialog', {
-        prompt: str(music ? args.prompt : args.text),
-        title: str(args.title) || (music ? 'Trilha' : 'Fala'),
-        settings: music && args.duration ? { duration: str(args.duration) } : undefined,
-        position: placer()(120),
-      });
-      return runAll([id], 3 * 60_000);
     }
 
     case 'organize_nodes':

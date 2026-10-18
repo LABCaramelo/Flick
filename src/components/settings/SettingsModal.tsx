@@ -3,6 +3,7 @@ import { CircleAlert, Plug, PlugZap, RefreshCw, X } from 'lucide-react';
 import { ACTIONS } from '../../../shared/actions';
 import type { ActionType } from '../../../shared/types';
 import { api, type HiggsfieldTools } from '../../lib/api';
+import { getAgentBudget, setAgentBudget } from '../../lib/cost';
 import { useProviders } from '../../store/providers';
 import { toast, useUi } from '../../store/ui';
 import './settings.css';
@@ -261,9 +262,39 @@ export function SettingsModal() {
                 <CircleAlert size={13} /> Defina <span className="mono">OPENAI_API_KEY</span> (e opcionalmente <span className="mono">OPENAI_MODEL</span>) no arquivo <span className="mono">.env</span> e reinicie o servidor.
               </div>
             )}
+            <AgentBudgetField />
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/** Auto mode limit: above it, or with no price, the agent waits for approval before generating. */
+function AgentBudgetField() {
+  const [value, setValue] = useState(() => getAgentBudget().toFixed(2));
+  return (
+    <label className="budget-row">
+      <div>
+        <div className="provider-name">Limite de gasto no modo Auto</div>
+        <small className="muted">Por resposta do agente. Acima disso, ou quando não há estimativa de custo, ele pede sua aprovação antes de gerar.</small>
+      </div>
+      <div className="budget-input">
+        <span className="muted">US$</span>
+        <input
+          className="input"
+          type="number"
+          min={0}
+          step={0.1}
+          value={value}
+          onChange={(e) => {
+            setValue(e.target.value);
+            const v = Number(e.target.value);
+            if (e.target.value !== '' && Number.isFinite(v) && v >= 0) setAgentBudget(v);
+          }}
+          onBlur={() => setValue(getAgentBudget().toFixed(2))}
+        />
+      </div>
+    </label>
   );
 }

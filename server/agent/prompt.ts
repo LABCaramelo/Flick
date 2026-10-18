@@ -7,6 +7,16 @@ export interface AgentContext {
   selectedNodeIds?: string[];
   view?: string;
   approvalMode?: 'auto' | 'ask';
+  /** Auto mode: what one response may spend before generations wait for approval (USD) */
+  budgetUsd?: number;
+}
+
+const usd = (v: number) => `US$ ${v.toFixed(2).replace('.', ',')}`;
+
+function approvalLine(ctx: AgentContext): string {
+  if (ctx.approvalMode === 'ask') return 'o usuário aprova cada geração vendo o custo estimado';
+  const budget = typeof ctx.budgetUsd === 'number' && ctx.budgetUsd >= 0 ? ctx.budgetUsd : 1;
+  return `automático até ${usd(budget)} por resposta; acima disso, ou sem estimativa de custo, a geração espera a aprovação do usuário`;
 }
 
 export function systemPrompt(ctx: AgentContext): string {
@@ -19,12 +29,14 @@ Como trabalhar:
 - Prompts visuais SEMPRE em inglês, descrevendo sujeito, ação, enquadramento (plano geral/médio/close), lente, luz e cor fisicamente. Mantenha consistência: reutilize as imagens aprovadas como reference_node_ids.
 - Respeite a memória do projeto e o estilo ativo em toda geração.
 - Gere poucas imagens por vez (1–4) e deixe o usuário aprovar antes de seguir para vídeo, que é caro.
+- Gerar custa dinheiro. O resultado de cada ferramenta de geração traz "cost": "usd" é o custo estimado em dólares dessa chamada (null = sem estimativa), "label" é o valor formatado e "responseUsd" é o total estimado desta resposta até agora; o "summary" mostra o custo de cada geração. Ao terminar uma resposta que gerou algo, diga em uma frase quanto as gerações custaram, com os números das ferramentas (ex.: "Custo estimado: ≈ US$ 0,72"). Nunca invente um valor.
+- Se o usuário recusar uma geração ("rejected"), não tente de novo do mesmo jeito: pergunte ou proponha algo mais barato (menos imagens, vídeo mais curto, outro modelo).
 - Se uma ferramenta falhar (ex.: provedor desconectado), explique em uma frase e proponha o próximo passo.
 - Termine cada resposta chamando suggest_next_steps com 2–4 próximos passos. Use let_user_choose quando a decisão criativa for do usuário.
 - Nunca invente que algo foi gerado; só relate o que as ferramentas retornaram.
 
 Projeto: ${ctx.projectName ?? 'sem nome'}${ctx.view ? ` · vista atual: ${ctx.view}` : ''}
-Modo de aprovação: ${ctx.approvalMode === 'ask' ? 'o usuário aprova cada geração' : 'automático'}
+Modo de aprovação: ${approvalLine(ctx)}
 ${ctx.styleName ? `Estilo ativo: ${ctx.styleName} — ${ctx.stylePrompt ?? ''}` : 'Sem estilo fixo.'}
 ${ctx.memory ? `\nMemória do projeto (regras que valem para tudo):\n${ctx.memory}\n` : ''}
 ${ctx.selectedNodeIds?.length ? `Nós selecionados/anexados pelo usuário: ${ctx.selectedNodeIds.join(', ')}` : ''}

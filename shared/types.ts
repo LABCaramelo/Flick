@@ -396,6 +396,22 @@ export interface ProviderStatus {
 
 export type ChatRole = 'user' | 'assistant';
 
+/** Expected charge of the generations an agent tool call starts. */
+export interface ToolCost {
+  /** sum of the estimates in USD; null when a generation has none */
+  usd: number | null;
+  /** generations priced */
+  count: number;
+  /** estimated total of the agent's response so far, this call included */
+  responseUsd?: number;
+  /** card label (pt-BR), e.g. "≈ US$ 0,36" */
+  label: string;
+  /** hover text */
+  title?: string;
+  /** why the Auto mode stopped for approval */
+  reason?: string;
+}
+
 export interface ToolCardState {
   callId: string;
   name: string;
@@ -404,6 +420,9 @@ export interface ToolCardState {
   summary?: string;
   error?: string;
   nodeIds?: string[];
+  cost?: ToolCost;
+  /** client only: the cost is still being asked for */
+  estimating?: boolean;
 }
 
 export interface ChatMessageView {
@@ -431,7 +450,7 @@ export type AgentStreamEvent =
   | { type: 'run'; runId: string; threadId: string; messageId: string }
   | { type: 'delta'; text: string }
   | { type: 'tool_call'; callId: string; name: string; args: Record<string, unknown>; needsApproval: boolean }
-  | { type: 'tool_result'; callId: string; ok: boolean; summary?: string; error?: string; nodeIds?: string[] }
+  | { type: 'tool_result'; callId: string; ok: boolean; rejected?: boolean; summary?: string; error?: string; nodeIds?: string[]; cost?: ToolCost }
   | { type: 'suggestions'; suggestions: string[] }
   | { type: 'choices'; question: string; options: string[] }
   | { type: 'error'; message: string }
