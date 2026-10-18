@@ -11,7 +11,7 @@ import { cancelJob, getJob, listJobs, startGeneration } from './jobs';
 import { downloadToProject, kindFromName, saveBuffer } from './media';
 import { activeModels, activeProviderId, allProviders, estimateCost, higgsfield, initProviders, setActiveProvider } from './providers';
 import { CALLBACK_PATH } from './providers/higgsfield';
-import { createProject, deleteProject, duplicateProject, ensureDirs, getProject, listProjects, patchProject, saveProject } from './storage';
+import { STORAGE_BACKEND, checkStorage, createProject, deleteProject, duplicateProject, ensureDirs, getProject, listProjects, patchProject, saveProject } from './storage';
 
 const app = express();
 app.disable('x-powered-by');
@@ -225,7 +225,8 @@ app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: 
 });
 
 await ensureDirs();
+await checkStorage();
 await initProviders();
 app.listen(PORT, () => {
-  console.log(`Claquete API em http://localhost:${PORT} · provedor de geração: ${activeProviderId()} · agente: ${agentConfigured() ? OPENAI_MODEL : 'sem OPENAI_API_KEY'}`);
+  console.log(`Claquete API em http://localhost:${PORT} · banco: ${STORAGE_BACKEND} · provedor de geração: ${activeProviderId()} · agente: ${agentConfigured() ? OPENAI_MODEL : 'sem OPENAI_API_KEY'}`);
 });

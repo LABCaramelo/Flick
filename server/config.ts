@@ -29,6 +29,10 @@ export const HIGGSFIELD_MCP_TOKEN = process.env.HIGGSFIELD_MCP_TOKEN || '';
 /** Higgsfield API credentials, "key-id:key-secret" (never logged) */
 export const HF_CREDENTIALS = (process.env.HF_CREDENTIALS || process.env.HF_KEY || '').trim();
 
-export const GENERATION_PROVIDER = (process.env.GENERATION_PROVIDER || (HF_CREDENTIALS ? 'higgsfield-api' : 'higgsfield')).toLowerCase();
+/** Supabase database. Server-only: the service_role key bypasses RLS and must never reach the browser. */
+export const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
+export const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
+
+export const GENERATION_PROVIDER =(process.env.GENERATION_PROVIDER || (HF_CREDENTIALS ? 'higgsfield-api' : 'higgsfield')).toLowerCase();
 
 export const IS_PROD = process.env.NODE_ENV === 'production';

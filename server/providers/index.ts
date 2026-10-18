@@ -1,7 +1,7 @@
 import { ACTIONS } from '../../shared/actions';
 import type { ActionType, CostEstimate, GenerateRequest, ModelInfo } from '../../shared/types';
 import { GENERATION_PROVIDER } from '../config';
-import { SETTINGS_FILE, readJson, writeJson } from '../storage';
+import { readSettings, writeSettings } from '../storage';
 import { HiggsfieldMcpProvider } from './higgsfield';
 import { HiggsfieldApiProvider, higgsfieldApiSupports } from './higgsfieldApi';
 import { MockProvider } from './mock';
@@ -20,7 +20,7 @@ interface Settings {
 let settings: Settings = {};
 
 export async function initProviders(): Promise<void> {
-  settings = (await readJson<Settings>(SETTINGS_FILE)) ?? {};
+  settings = (await readSettings<Settings>()) ?? {};
   await higgsfield.init();
 }
 
@@ -70,7 +70,7 @@ export async function activeModels(): Promise<ModelInfo[]> {
 export async function setActiveProvider(id: string): Promise<void> {
   if (!providers[id]) throw Object.assign(new Error('provedor desconhecido'), { status: 400 });
   settings.provider = id;
-  await writeJson(SETTINGS_FILE, settings);
+  await writeSettings(settings);
 }
 
 export function allProviders(): GenerationProvider[] {

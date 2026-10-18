@@ -11,13 +11,15 @@
     "build": "vite build",
     "start": "cross-env NODE_ENV=production tsx server/index.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "higgsfield:example": "tsx index.ts"
+    "higgsfield:example": "tsx index.ts",
+    "db:import": "tsx server/scripts/importLocalData.ts"
   },
   "dependencies": {
     "@higgsfield/client": "^0.2.6",
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@react-three/drei": "^10.7.9",
     "@react-three/fiber": "^9.8.2",
+    "@supabase/supabase-js": "^2.118.0",
     "@tiptap/extension-placeholder": "^2.27.3",
     "@tiptap/pm": "^2.27.3",
     "@tiptap/react": "^2.27.3",

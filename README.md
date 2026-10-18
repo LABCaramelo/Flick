@@ -79,3 +79,11 @@ A interface segue o Design System Caramelo (material Lumen, tema escuro). Os arq
 - `src/components/ui/caramelo/`: `Isotype` e `PointerTrail`, portados do pacote. O rastro aparece no topo da Home.
 
 Para atualizar, copie de novo `dist/styles.css`, `dist/fonts/` e `src/assets/` do Design System.
+
+## Banco de dados (Supabase)
+
+Com `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` no `.env.local`, projetos, conversas e configurações vão para as tabelas `flick_*` do Supabase; sem elas, ficam em `data/`. Mídias e credenciais OAuth continuam em `data/`.
+
+- Só o servidor acessa o banco, com a chave `service_role`. As tabelas têm RLS sem políticas, então as chaves públicas (anon) não leem nem gravam nada.
+- O schema está em `supabase/migrations/` (aplique em ordem no SQL Editor do Supabase).
+- Para copiar o que já existe em `data/` para o banco: `npm run db:import`.
