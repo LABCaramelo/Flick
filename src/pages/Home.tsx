@@ -6,7 +6,7 @@ import { STYLE_PRESETS } from '../../shared/styles';
 import { ASPECT_RATIOS } from '../../shared/actions';
 import { api } from '../lib/api';
 import { Brand } from '../components/ui/Brand';
-import { PointerTrail } from '../components/ui/caramelo/PointerTrail';
+import { PointerTrail } from '@caramelo/design-system';
 import { Dropdown, Popover, anchorBelow, type Anchor } from '../components/ui/Menu';
 import { ProviderPill } from '../components/settings/ProviderPill';
 import { useUi, toast } from '../store/ui';

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Isotype } from './caramelo/Isotype';
+import { Isotype } from '@caramelo/design-system';
 
 /** Caramelo isotype + Claquete wordmark. */
 export function Brand({ compact }: { compact?: boolean }) {

@@ -33,6 +33,14 @@ export const HF_CREDENTIALS = (process.env.HF_CREDENTIALS || process.env.HF_KEY 
 export const SUPABASE_URL = (process.env.SUPABASE_URL || '').trim();
 export const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim();
 
-export const GENERATION_PROVIDER =(process.env.GENERATION_PROVIDER || (HF_CREDENTIALS ? 'higgsfield-api' : 'higgsfield')).toLowerCase();
+/** Cloudflare R2 Storage (bucket: umcaracaramelo, CDN: media.umcaracaramelo.com.br) */
+export const CLOUDFLARE_ACCOUNT_ID = (process.env.CLOUDFLARE_ACCOUNT_ID || '0b85653a3fda604ea469fb2723afa5cb').trim();
+export const CLOUDFLARE_API_TOKEN = (process.env.CLOUDFLARE_API_TOKEN || process.env.CF_API_TOKEN || '').trim();
+export const R2_BUCKET_NAME = (process.env.R2_BUCKET_NAME || 'umcaracaramelo').trim();
+export const R2_PUBLIC_DOMAIN = (process.env.R2_PUBLIC_DOMAIN || 'https://media.umcaracaramelo.com.br').replace(/\/$/, '');
+export const R2_ACCESS_KEY_ID = (process.env.R2_ACCESS_KEY_ID || '').trim();
+export const R2_SECRET_ACCESS_KEY = (process.env.R2_SECRET_ACCESS_KEY || '').trim();
+
+export const GENERATION_PROVIDER = (process.env.GENERATION_PROVIDER || (HF_CREDENTIALS ? 'higgsfield-api' : 'higgsfield')).toLowerCase();
 
 export const IS_PROD = process.env.NODE_ENV === 'production';

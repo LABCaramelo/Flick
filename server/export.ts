@@ -3,6 +3,7 @@ import { timelineDuration, uid } from '../shared/project';
 import type { Clip, Project, Timeline } from '../shared/types';
 import { createJob, emitJob } from './jobs';
 import { mediaPath, resolveMediaUrl, run } from './media';
+import { buildR2Key, uploadBufferToR2 } from './r2';
 import { getProject } from './storage';
 
 // Timeline -> MP4. Every visual clip is overlaid on a black canvas inside
@@ -172,7 +173,16 @@ export async function startExport(opts: ExportOptions) {
       if (res.code !== 0) throw new Error(res.stderr.split('\n').slice(-6).join('\n'));
       job.status = 'completed';
       job.progress = 100;
-      job.outputs = [{ url: `/media/${project.projectId}/exports/${name}`, type: 'video', width: W, height: H, duration: total }];
+      let exportUrl = `/media/${project.projectId}/exports/${name}`;
+      try {
+        const r2Key = buildR2Key(project.projectId, 'exports', name);
+        const buf = await fs.promises.readFile(outFile);
+        const r2 = await uploadBufferToR2(r2Key, buf, 'video/mp4');
+        if (r2?.url) exportUrl = r2.url;
+      } catch (r2Err) {
+        console.warn('[export] Fallback para mídia local:', r2Err);
+      }
+      job.outputs = [{ url: exportUrl, type: 'video', width: W, height: H, duration: total }];
       emitJob(job);
     } catch (err) {
       job.status = 'failed';
