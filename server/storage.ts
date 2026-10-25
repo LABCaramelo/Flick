@@ -4,6 +4,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { PROJECTS_DIR, DATA_DIR, MEDIA_DIR, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_URL } from './config';
 import { createEmptyProject, normalizeProject } from '../shared/project';
 import type { ChatThread, Project, ProjectSummary } from '../shared/types';
+import { AccessError, accessScope, authorizeMediaReferences } from './access';
 
 const SAFE_ID = /^[a-zA-Z0-9-]{6,64}$/;
 
@@ -98,7 +99,7 @@ const fileStore: Store = {
  * Supabase tables from supabase/migrations. Only this server reaches them, with
  * the service_role key; RLS has no policies, so the public keys get nothing.
  */
-function supabaseStore(db: SupabaseClient): Store {
+function supabaseStore(db: SupabaseClient, ownerId?: string): Store {
   const must = <T>(res: { data: T; error: { message: string } | null }, what: string): T => {
     if (res.error) throw Object.assign(new Error(`Supabase (${what}): ${res.error.message}`), { status: 502 });
     return res.data;
@@ -107,6 +108,7 @@ function supabaseStore(db: SupabaseClient): Store {
 
   const toRow = (p: Project) => ({
     id: p.projectId,
+    ...(ownerId ? { user_id: ownerId } : {}),
     name: p.name,
     version: p.version,
     thumbnail: p.thumbnail ?? null,
@@ -150,8 +152,10 @@ function supabaseStore(db: SupabaseClient): Store {
 
   return {
     async list() {
+      let query = db.from('flick_projects').select('id, name, created_at, last_saved, thumbnail, node_count');
+      if (ownerId) query = query.eq('user_id', ownerId);
       const rows = must(
-        await db.from('flick_projects').select('id, name, created_at, last_saved, thumbnail, node_count').order('last_saved', { ascending: false }),
+        await query.order('last_saved', { ascending: false }),
         'listar projetos',
       );
       return (rows ?? []).map((r) => ({
@@ -164,7 +168,9 @@ function supabaseStore(db: SupabaseClient): Store {
       }));
     },
     async get(id) {
-      const row = must(await db.from('flick_projects').select('*').eq('id', assertId(id)).maybeSingle(), 'ler projeto');
+      let query = db.from('flick_projects').select('*').eq('id', assertId(id));
+      if (ownerId) query = query.eq('user_id', ownerId);
+      const row = must(await query.maybeSingle(), 'ler projeto');
       return row ? fromRow(row as ProjectRow) : undefined;
     },
     put: (p) =>
@@ -173,7 +179,9 @@ function supabaseStore(db: SupabaseClient): Store {
       }),
     async remove(id) {
       // chat threads, jobs and media rows go with it (ON DELETE CASCADE)
-      must(await db.from('flick_projects').delete().eq('id', assertId(id)), 'apagar projeto');
+      let query = db.from('flick_projects').delete().eq('id', assertId(id));
+      if (ownerId) query = query.eq('user_id', ownerId);
+      must(await query, 'apagar projeto');
     },
     async readChat(projectId) {
       const rows = must(
@@ -227,6 +235,18 @@ const db =
 
 const store: Store = db ? supabaseStore(db) : fileStore;
 
+// AsyncLocalStorage follows every promise/timer created by this request, including jobs.
+// Project operations always require a caller JWT. Service-role/local stores are
+// reserved for server settings/startup; a lost request context must fail closed.
+const requestStores = new WeakMap<object, Store>();
+function currentStore(): Store {
+  const access = accessScope.getStore();
+  if (!access) throw new AccessError(401, 'Entre no LAB para continuar.');
+  let scoped = requestStores.get(access);
+  if (!scoped) { scoped = supabaseStore(access.db, access.userId); requestStores.set(access, scoped); }
+  return scoped;
+}
+
 export const STORAGE_BACKEND: 'supabase' | 'local' = db ? 'supabase' : 'local';
 
 export async function ensureDirs(): Promise<void> {
@@ -247,17 +267,18 @@ export async function checkStorage(): Promise<void> {
 
 export async function listProjects(): Promise<ProjectSummary[]> {
   await ensureDirs();
-  return store.list();
+  return currentStore().list();
 }
 
 export async function getProject(id: string): Promise<Project | undefined> {
-  const p = await store.get(id);
+  const p = await currentStore().get(id);
+  if (p) await authorizeMediaReferences(p);
   return p ? normalizeProject(p) : undefined;
 }
 
 export async function createProject(name?: string): Promise<Project> {
   const p = createEmptyProject(name || 'Sem título');
-  await store.put(p);
+  await currentStore().put(p);
   return p;
 }
 
@@ -269,15 +290,16 @@ export function thumbnailOf(p: Project): string | undefined {
 
 export async function saveProject(p: Project): Promise<Project> {
   const project = normalizeProject(p);
+  await authorizeMediaReferences(project);
   project.lastSaved = new Date().toISOString();
   project.thumbnail = thumbnailOf(project);
-  await store.put(project);
+  await currentStore().put(project);
   return project;
 }
 
 /** Store a project as-is (keeps its lastSaved), for imports. */
 export async function importProject(p: Project): Promise<void> {
-  await store.put(normalizeProject(p));
+  await currentStore().put(normalizeProject(p));
 }
 
 /** Read-modify-write used by background jobs (e.g. a finished generation). */
@@ -289,7 +311,7 @@ export async function patchProject(id: string, fn: (p: Project) => void): Promis
 }
 
 export async function deleteProject(id: string): Promise<void> {
-  await store.remove(id);
+  await currentStore().remove(id);
   // media files stay on disk in both modes
   await fs.rm(path.join(MEDIA_DIR, assertId(id)), { recursive: true, force: true });
 }
@@ -299,18 +321,18 @@ export async function duplicateProject(id: string): Promise<Project | undefined>
   if (!p) return undefined;
   const copy = createEmptyProject(`${p.name} (cópia)`);
   const dup: Project = { ...structuredClone(p), projectId: copy.projectId, name: copy.name, createdAt: copy.createdAt };
-  await store.put(dup);
+  await currentStore().put(dup);
   return dup;
 }
 
 // ---------- chat threads (server-owned) ----------
 
 export function readChat(projectId: string): Promise<ChatFile> {
-  return store.readChat(projectId);
+  return currentStore().readChat(projectId);
 }
 
 export function writeChat(projectId: string, chat: ChatFile): Promise<void> {
-  return store.writeChat(projectId, chat);
+  return currentStore().writeChat(projectId, chat);
 }
 
 // ---------- app settings ----------

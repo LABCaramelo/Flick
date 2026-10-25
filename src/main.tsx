@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { enableMapSet } from 'immer';
 import { App } from './App';
+import { LabGate } from './LabGate';
 import '@caramelo/design-system/styles.css';
 import './styles/caramelo/caramelo.css';
 import './styles/global.css';
@@ -45,6 +46,6 @@ window.addEventListener(
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <LabGate><App /></LabGate>
   </StrictMode>,
 );

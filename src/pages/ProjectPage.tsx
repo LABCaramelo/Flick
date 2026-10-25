@@ -2,6 +2,8 @@ import { Suspense, lazy, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import type { JobState } from '../../shared/types';
 import { api } from '../lib/api';
+import { labAuthorization } from '../lib/labAccess';
+import { subscribeProjectEvents } from '../lib/projectEvents';
 import { applyJob } from '../lib/generation';
 import { useProject, type View } from '../store/project';
 import { TopBar } from '../components/TopBar';
@@ -84,7 +86,7 @@ export function ProjectPage() {
       const p = useProject.getState().project;
       if (!p || !saveTimer.current) return;
       const body = JSON.stringify(p);
-      if (body.length < 60_000) fetch(`/api/projects/${p.projectId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body, keepalive: true });
+      if (body.length < 60_000) void labAuthorization().then((auth) => fetch(`/api/projects/${p.projectId}`, { method: 'PUT', headers: { ...auth, 'Content-Type': 'application/json' }, body, keepalive: true })).catch(() => {});
     };
     window.addEventListener('beforeunload', flush);
     return () => {
@@ -100,16 +102,12 @@ export function ProjectPage() {
   // ---------- server events ----------
   useEffect(() => {
     if (!loaded) return;
-    const es = new EventSource(`/api/events?projectId=${projectId}`);
-    es.addEventListener('job', (e) => applyJob(JSON.parse((e as MessageEvent).data) as JobState));
-    // reconcile after (re)connect so no finished job is missed
-    es.addEventListener('hello', () => {
-      api
-        .listJobs(projectId)
-        .then((jobs) => jobs.forEach(applyJob))
-        .catch(() => undefined);
+    const close = subscribeProjectEvents(projectId, (event, data) => {
+      if (event === 'job') applyJob(data as JobState);
+      // Reconcile after (re)connect so no finished job is missed.
+      if (event === 'hello') void api.listJobs(projectId).then((jobs) => jobs.forEach(applyJob)).catch(() => undefined);
     });
-    return () => es.close();
+    return close;
   }, [loaded, projectId]);
 
   if (error)

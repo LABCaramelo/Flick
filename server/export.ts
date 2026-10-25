@@ -5,6 +5,7 @@ import { createJob, emitJob } from './jobs';
 import { mediaPath, resolveMediaUrl, run } from './media';
 import { buildR2Key, uploadBufferToR2 } from './r2';
 import { getProject } from './storage';
+import { accessScope } from './access';
 
 // Timeline -> MP4. Every visual clip is overlaid on a black canvas inside
 // its [start, end) window, in track order (main track at the bottom), so the
@@ -177,7 +178,7 @@ export async function startExport(opts: ExportOptions) {
       try {
         const r2Key = buildR2Key(project.projectId, 'exports', name);
         const buf = await fs.promises.readFile(outFile);
-        const r2 = await uploadBufferToR2(r2Key, buf, 'video/mp4');
+        const r2 = accessScope.getStore() ? null : await uploadBufferToR2(r2Key, buf, 'video/mp4');
         if (r2?.url) exportUrl = r2.url;
       } catch (r2Err) {
         console.warn('[export] Fallback para mídia local:', r2Err);

@@ -9,7 +9,7 @@ const clients = new Set<Client>();
 export function subscribe(projectId: string, res: Response): () => void {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
+    'Cache-Control': 'private, no-store, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });

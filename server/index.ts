@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import multer from 'multer';
 import type { GenerateRequest, Project } from '../shared/types';
-import { agentConfigured, cancelRun, deleteThread, deliverToolResult, getThread, listThreads, runAgent } from './agent/agent';
+import { agentConfigured, cancelRun, deleteThread, deliverToolResult, getThread, listThreads, ownedRunProject, runAgent } from './agent/agent';
 import { DIST_DIR, HIGGSFIELD_MCP_URL, IS_PROD, MEDIA_DIR, OPENAI_MODEL, PORT } from './config';
 import { subscribe } from './events';
 import { startExport } from './export';
@@ -12,10 +13,10 @@ import { downloadToProject, kindFromName, saveBuffer } from './media';
 import { activeModels, activeProviderId, allProviders, estimateCost, higgsfield, initProviders, setActiveProvider } from './providers';
 import { CALLBACK_PATH } from './providers/higgsfield';
 import { STORAGE_BACKEND, checkStorage, createProject, deleteProject, duplicateProject, ensureDirs, getProject, listProjects, patchProject, saveProject } from './storage';
+import { AccessError, accessScope, authorizeMediaReferences, currentAccess, mediaAuthorization, mediaCookie, requireAdmin, requireProject, verifyAccess } from './access';
 
 const app = express();
 app.disable('x-powered-by');
-app.use(express.json({ limit: '60mb' }));
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 500 * 1024 * 1024 } });
 
@@ -23,6 +24,70 @@ type Handler = (req: Request, res: Response) => Promise<unknown> | unknown;
 const h = (fn: Handler) => (req: Request, res: Response, next: NextFunction) => Promise.resolve(fn(req, res)).catch(next);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
+
+// OAuth redirects cannot carry a Bearer header. Only a one-use state issued by an
+// authenticated administrator may resume the pending server connection.
+let pendingOAuth: { state: string; token: string; expires: number } | undefined;
+app.use('/api', (req, res, next) => {
+  void (async () => {
+  const isCallback = req.path === CALLBACK_PATH.replace(/^\/api/, '');
+  let authorization = req.headers.authorization;
+  if (isCallback) {
+    const pending = pendingOAuth;
+    if (!pending || pending.expires <= Date.now() || req.query.state !== pending.state) {
+      throw new AccessError(401, 'Conexão expirada. Inicie novamente pelo Claquete.');
+    }
+    pendingOAuth = undefined;
+    authorization = `Bearer ${pending.token}`;
+  }
+  const access = await verifyAccess(authorization);
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Vary', 'Authorization');
+  res.setHeader('Set-Cookie', mediaCookie(access, req.secure || process.env.NODE_ENV === 'production'));
+  // Bound long-lived SSE/agent responses to the token and current acquisition.
+  let checking = false;
+  const validityTimer = setInterval(() => {
+    if (checking || res.writableEnded) return;
+    checking = true;
+    void verifyAccess(`Bearer ${access.token}`).catch(() => res.end()).finally(() => { checking = false; });
+  }, 30_000);
+  const expiryTimer = setTimeout(() => res.end(), Math.min(access.expiresAt - Date.now(), 2_147_000_000));
+  const cleanup = () => { clearInterval(validityTimer); clearTimeout(expiryTimer); };
+  res.once('finish', cleanup);
+  res.once('close', cleanup);
+  accessScope.run(access, next);
+  })().catch(next);
+});
+app.use(express.json({ limit: '60mb' }));
+
+// All project-derived endpoints are checked before route handlers can read files,
+// start jobs, subscribe to streams or write rows. A guessed id reveals no project.
+app.use('/api', (req, _res, next) => {
+  void (async () => {
+    const projectRoute = /^\/projects\/([^/]+)/.exec(req.path);
+    let projectId: string | undefined = projectRoute?.[1];
+    if (['/generate', '/estimate', '/export', '/agent/chat'].includes(req.path)) projectId = String(req.body?.projectId ?? '');
+    if (['/events', '/jobs', '/agent/threads'].includes(req.path) || req.path.startsWith('/agent/threads/')) projectId = String(req.query.projectId ?? '');
+    if (/^\/jobs\/[^/]+/.test(req.path)) {
+      const id = req.path.split('/')[2];
+      const job = getJob(id);
+      if (!job) throw new AccessError(404, 'Job não encontrado.');
+      projectId = job.projectId;
+    }
+    if (['/agent/tool-result', '/agent/cancel'].includes(req.path)) {
+      projectId = ownedRunProject(String(req.body?.runId ?? ''));
+      if (!projectId) throw new AccessError(404, 'Execução não encontrada.');
+    }
+    if (projectId !== undefined) await requireProject(projectId);
+    if (req.body) await authorizeMediaReferences(req.body);
+    // Provider auth, mapping and active-provider settings are shared by this
+    // server. Tool ownership alone cannot authorize changing its credentials.
+    if (req.path.startsWith('/providers/') && req.method !== 'GET') await requireAdmin();
+    if (req.path === '/providers/higgsfield/tools') await requireAdmin();
+    if (req.path === CALLBACK_PATH.replace(/^\/api/, '')) await requireAdmin();
+    next();
+  })().catch(next);
+});
 
 // ---------------- projects ----------------
 
@@ -144,7 +209,15 @@ app.get('/api/models', h(async (_req, res) => res.json(await activeModels())));
 
 app.post('/api/providers/higgsfield/connect', h(async (_req, res) => {
   try {
-    res.json(await higgsfield.beginAuth());
+    const result = await higgsfield.beginAuth();
+    if (result.authUrl) {
+      const state = randomBytes(32).toString('base64url');
+      pendingOAuth = { state, token: currentAccess().token, expires: Date.now() + 5 * 60_000 };
+      const url = new URL(result.authUrl);
+      url.searchParams.set('state', state);
+      result.authUrl = url.toString();
+    }
+    res.json(result);
   } catch (err) {
     res.status(502).json({ error: String((err as Error)?.message ?? err) });
   }
@@ -211,7 +284,17 @@ app.delete('/api/agent/threads/:threadId', h(async (req, res) => {
 
 // ---------------- static ----------------
 
-app.use('/media', express.static(MEDIA_DIR, { maxAge: '7d', fallthrough: false }));
+app.use('/media', (req, res, next) => {
+  void verifyAccess(req.headers.authorization || mediaAuthorization(req.headers.cookie)).then((access) => {
+    accessScope.run(access, () => {
+      const projectId = req.path.split('/')[1];
+      void requireProject(projectId).then(() => {
+        res.setHeader('Cache-Control', 'private, no-store');
+        next();
+      }).catch(next);
+    });
+  }).catch(next);
+}, express.static(MEDIA_DIR, { maxAge: 0, fallthrough: false, setHeaders: (res) => res.setHeader('Cache-Control', 'private, no-store') }));
 
 if (IS_PROD && fs.existsSync(DIST_DIR)) {
   app.use(express.static(DIST_DIR));
@@ -221,7 +304,7 @@ if (IS_PROD && fs.existsSync(DIST_DIR)) {
 app.use((err: Error & { status?: number }, _req: Request, res: Response, _next: NextFunction) => {
   const status = err.status ?? 500;
   if (status >= 500) console.error('[api]', err);
-  if (!res.headersSent) res.status(status).json({ error: err.message ?? 'erro interno' });
+  if (!res.headersSent) res.status(status).json({ error: status >= 500 ? 'Não foi possível concluir a operação.' : err.message ?? 'erro interno' });
 });
 
 await ensureDirs();

@@ -6,6 +6,7 @@ import { assertId } from './storage';
 import { uid } from '../shared/project';
 import type { MediaKind } from '../shared/types';
 import { buildR2Key, uploadBufferToR2 } from './r2';
+import { accessScope, mayReadProjectMedia } from './access';
 
 const EXT_BY_MIME: Record<string, string> = {
   'image/png': 'png',
@@ -58,18 +59,19 @@ export function mediaPath(projectId: string, ...parts: string[]): string {
 export function resolveMediaUrl(url: string): string | undefined {
   const clean = url.split('?')[0];
   let m = /^\/media\/([a-zA-Z0-9-]{6,64})\/([a-zA-Z0-9._/-]+)$/.exec(clean);
-  if (m && !m[2].includes('..')) {
+  if (m && !m[2].includes('..') && mayReadProjectMedia(m[1])) {
     return path.join(MEDIA_DIR, m[1], m[2]);
   }
   m = /media\.umcaracaramelo\.com\.br\/claquete\/([a-zA-Z0-9-]{6,64})\/([a-zA-Z0-9._/-]+)$/.exec(clean);
-  if (m && !m[2].includes('..')) {
+  if (m && !m[2].includes('..') && mayReadProjectMedia(m[1])) {
     return path.join(MEDIA_DIR, m[1], m[2]);
   }
   return undefined;
 }
 
 export async function saveBuffer(projectId: string, buf: Buffer, opts: { ext?: string; mime?: string; sub?: string } = {}): Promise<SavedMedia> {
-  const ext = (opts.ext ?? (opts.mime ? EXT_BY_MIME[opts.mime.split(';')[0]] : undefined) ?? 'bin').toLowerCase();
+  const candidateExt = (opts.ext ?? (opts.mime ? EXT_BY_MIME[opts.mime.split(';')[0]] : undefined) ?? 'bin').toLowerCase();
+  const ext = /^[a-z0-9]{1,12}$/.test(candidateExt) ? candidateExt : 'bin';
   const sub = opts.sub ?? 'uploads';
   const name = `${uid()}.${ext}`;
   const file = mediaPath(projectId, sub, name);
@@ -80,7 +82,9 @@ export async function saveBuffer(projectId: string, buf: Buffer, opts: { ext?: s
 
   // Cloudflare R2 upload (with fallback to local URL)
   const r2Key = buildR2Key(projectId, sub, name);
-  const r2Result = await uploadBufferToR2(r2Key, buf, opts.mime);
+  // Project data from authenticated requests must not be published on the public
+  // CDN. Serve these files through the protected /media route instead.
+  const r2Result = accessScope.getStore() ? null : await uploadBufferToR2(r2Key, buf, opts.mime);
   const url = r2Result?.url ?? `/media/${projectId}/${sub}/${name}`;
 
   return { url, file, kind, ...meta };
@@ -151,6 +155,6 @@ export async function fileToDataUri(file: string): Promise<string> {
 /** Public URL for a media file: returns R2 public URL directly or tunnel URL. */
 export function publicUrlFor(localUrl: string): string | undefined {
   if (localUrl.startsWith('http://') || localUrl.startsWith('https://')) return localUrl;
-  if (!PUBLIC_BASE_URL || !localUrl.startsWith('/media/')) return undefined;
+  if (accessScope.getStore() || !PUBLIC_BASE_URL || !localUrl.startsWith('/media/')) return undefined;
   return `${PUBLIC_BASE_URL}${localUrl}`;
 }

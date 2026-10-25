@@ -8,6 +8,7 @@ import { resolveMediaUrl } from '../media';
 import { readChat, writeChat } from '../storage';
 import { systemPrompt, type AgentContext } from './prompt';
 import { AGENT_TOOLS, GENERATION_TOOLS, SERVER_TOOLS } from './tools';
+import { accessScope, currentAccess } from '../access';
 
 type Msg = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -33,6 +34,8 @@ export interface ToolResultPayload {
 
 interface Run {
   id: string;
+  projectId: string;
+  userId: string;
   aborted: boolean;
   controller: AbortController;
   pending: Map<string, (r: ToolResultPayload) => void>;
@@ -40,12 +43,19 @@ interface Run {
 
 const runs = new Map<string, Run>();
 
+/** Only exposes a run's project to the same verified account that started it. */
+export function ownedRunProject(runId: string): string | undefined {
+  const run = runs.get(runId);
+  return run?.userId === currentAccess().userId ? run.projectId : undefined;
+}
+
 export function agentConfigured(): boolean {
   return !!OPENAI_API_KEY;
 }
 
 export function deliverToolResult(runId: string, callId: string, result: ToolResultPayload): boolean {
   const r = runs.get(runId);
+  if (r?.userId !== currentAccess().userId) return false;
   const resolve = r?.pending.get(callId);
   if (!resolve) return false;
   r!.pending.delete(callId);
@@ -55,7 +65,7 @@ export function deliverToolResult(runId: string, callId: string, result: ToolRes
 
 export function cancelRun(runId: string): boolean {
   const r = runs.get(runId);
-  if (!r) return false;
+  if (!r || r.userId !== currentAccess().userId) return false;
   r.aborted = true;
   r.controller.abort();
   for (const [id, resolve] of r.pending) resolve({ ok: false, error: 'cancelado pelo usuário' });
@@ -84,9 +94,10 @@ function threadTitle(text: string): string {
 }
 
 export async function runAgent(req: ChatRequest, res: Response): Promise<void> {
+  const access = currentAccess();
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
+    'Cache-Control': 'private, no-store, no-transform',
     Connection: 'keep-alive',
     'X-Accel-Buffering': 'no',
   });
@@ -124,12 +135,12 @@ export async function runAgent(req: ChatRequest, res: Response): Promise<void> {
   }
   history.push({ role: 'user', content: userParts });
 
-  const run: Run = { id: uid(), aborted: false, controller: new AbortController(), pending: new Map() };
+  const run: Run = { id: uid(), projectId: req.projectId, userId: currentAccess().userId, aborted: false, controller: new AbortController(), pending: new Map() };
   runs.set(run.id, run);
   const assistantView: ChatMessageView = { id: uid(), role: 'assistant', content: '', tools: [], createdAt: now };
   send({ type: 'run', runId: run.id, threadId: thread.id, messageId: assistantView.id });
   res.on('close', () => {
-    if (!res.writableEnded) cancelRun(run.id);
+    if (!res.writableEnded) accessScope.run(access, () => cancelRun(run.id));
   });
 
   const ctx: AgentContext = { ...(req.context ?? {}) };

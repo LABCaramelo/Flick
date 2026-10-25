@@ -13,11 +13,12 @@ import type {
 import { DEFAULT_MODELS } from '../../shared/actions';
 import { createEmptyProject } from '../../shared/project';
 import { supabase } from './supabase';
+import { labAuthorization, labCredentials } from './labAccess';
 
 async function req<T>(method: string, url: string, body?: unknown): Promise<T> {
   const res = await fetch(url, {
     method,
-    headers: body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
+    headers: { ...await labAuthorization(), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}) },
     body: body !== undefined ? JSON.stringify(body) : undefined,
   });
   const text = await res.text();
@@ -50,6 +51,7 @@ export interface HiggsfieldTools {
 
 export const api = {
   async listProjects(): Promise<ProjectSummary[]> {
+    await labCredentials();
     try {
       const { data, error } = await supabase
         .from('flick_projects')
@@ -72,11 +74,13 @@ export const api = {
   },
 
   async createProject(name?: string): Promise<Project> {
+    const { userId } = await labCredentials();
     const id = crypto.randomUUID();
     const proj = createEmptyProject(id, name || 'Projeto sem título');
     try {
       const { error } = await supabase.from('flick_projects').insert({
         id: proj.projectId,
+        user_id: userId,
         name: proj.name,
         version: proj.version,
         thumbnail: proj.thumbnail ?? null,
@@ -102,6 +106,7 @@ export const api = {
   },
 
   async getProject(id: string): Promise<Project> {
+    await labCredentials();
     try {
       const { data, error } = await supabase.from('flick_projects').select('*').eq('id', id).maybeSingle();
       if (!error && data) {
@@ -130,10 +135,12 @@ export const api = {
   },
 
   async saveProject(p: Project): Promise<{ lastSaved: string; thumbnail?: string }> {
+    const { userId } = await labCredentials();
     const lastSaved = new Date().toISOString();
     try {
       const { error } = await supabase.from('flick_projects').upsert({
         id: p.projectId,
+        user_id: userId,
         name: p.name,
         version: p.version,
         thumbnail: p.thumbnail ?? null,
@@ -158,6 +165,7 @@ export const api = {
   },
 
   async renameProject(id: string, name: string): Promise<unknown> {
+    await labCredentials();
     try {
       const { error } = await supabase.from('flick_projects').update({ name, updated_at: new Date().toISOString() }).eq('id', id);
       if (!error) return { ok: true };
@@ -168,6 +176,7 @@ export const api = {
   },
 
   async deleteProject(id: string): Promise<unknown> {
+    await labCredentials();
     try {
       const { error } = await supabase.from('flick_projects').delete().eq('id', id);
       if (!error) return { ok: true };
@@ -194,7 +203,8 @@ export const api = {
   async upload(projectId: string, files: File[]): Promise<UploadedMedia[]> {
     const fd = new FormData();
     files.forEach((f) => fd.append('files', f, f.name));
-    const res = await fetch(`/api/projects/${projectId}/upload`, { method: 'POST', body: fd }).catch(() => null);
+    const headers = await labAuthorization();
+    const res = await fetch(`/api/projects/${projectId}/upload`, { method: 'POST', headers, body: fd }).catch(() => null);
     if (res && res.ok) {
       return (await res.json()) as UploadedMedia[];
     }
@@ -220,9 +230,9 @@ export const api = {
   } as unknown as JobState)),
 
   estimate: (r: GenerateRequest) => req<CostEstimate>('POST', '/api/estimate', r).catch(() => ({
-    costCredits: 0,
-    costUsd: 0,
-    unit: 'grátis (simulado)',
+    usd: null,
+    source: 'unknown',
+    note: 'Não foi possível consultar o custo agora.',
   } as CostEstimate)),
 
   cancelJob: (id: string) => req('POST', `/api/jobs/${id}/cancel`).catch(() => undefined),
@@ -237,15 +247,15 @@ export const api = {
   providers: () => req<ProvidersInfo>('GET', '/api/providers').catch(() => ({
     active: 'offline',
     providers: [
-      { id: 'offline', name: 'Demonstração (Simulado)', status: 'ready' as const, description: 'Geração rápida de amostras sem custo de API' },
-      { id: 'higgsfield', name: 'Higgsfield AI', status: 'not_configured' as const, description: 'Geração cinematográfica em 4K' },
+      { id: 'offline', name: 'Servidor indisponível', connected: false, detail: 'Não foi possível consultar o servidor.' },
+      { id: 'higgsfield', name: 'Higgsfield AI', connected: false, detail: 'Não foi possível consultar a conexão.' },
     ],
     agent: { configured: false, model: 'gpt-4o' },
   })),
 
   setProvider: (id: string) => req('PUT', '/api/providers/active', { id }).catch(() => undefined),
   models: () => req<ModelInfo[]>('GET', '/api/models').catch(() => DEFAULT_MODELS),
-  higgsfieldConnect: () => req<{ authUrl?: string; connected: boolean }>('POST', '/api/providers/higgsfield/connect').catch(() => ({ connected: false })),
+  higgsfieldConnect: () => req<{ authUrl?: string; connected: boolean }>('POST', '/api/providers/higgsfield/connect').catch(() => ({ connected: false, authUrl: undefined })),
   higgsfieldDisconnect: () => req('POST', '/api/providers/higgsfield/disconnect').catch(() => undefined),
   higgsfieldTools: () => req<HiggsfieldTools>('GET', '/api/providers/higgsfield/tools'),
   higgsfieldSetMapping: (m: unknown) => req('PUT', '/api/providers/higgsfield/mapping', m),
@@ -261,13 +271,13 @@ export const api = {
 export async function streamAgent(body: unknown, onEvent: (e: AgentStreamEvent) => void, signal?: AbortSignal): Promise<void> {
   const res = await fetch('/api/agent/chat', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { ...await labAuthorization(), 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
     signal,
   }).catch(() => null);
   if (!res || !res.ok || !res.body) {
-    onEvent({ type: 'delta', delta: 'Agente offline. Configure sua chave OpenAI nas configurações para ativar.' });
-    onEvent({ type: 'done' });
+    onEvent({ type: 'error', message: 'Não foi possível conectar ao agente agora.' });
+    onEvent({ type: 'done', threadId: (body as { threadId?: string } | null)?.threadId ?? '' });
     return;
   }
   const reader = res.body.getReader();
