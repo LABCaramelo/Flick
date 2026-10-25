@@ -204,6 +204,7 @@ function supabaseStore(db: SupabaseClient, ownerId?: string): Store {
           const rows = changed.map((t) => ({
             id: t.id,
             project_id: assertId(projectId),
+            ...(ownerId ? { user_id: ownerId } : {}),
             title: t.title,
             messages: t.messages,
             openai_history: t.openai,
