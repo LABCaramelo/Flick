@@ -456,6 +456,32 @@ a {
 .brand svg {
   display: block;
 }
+.brand-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.brand-name {
+  font-family: var(--font-display, "Montserrat", sans-serif);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  font-size: 16px;
+  color: var(--text-strong);
+}
+.brand-badge {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.05em !important;
+  padding: 1px 7px !important;
+  line-height: 1.4 !important;
+}
+.topbar-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
 .project-name {
   background: transparent;
   border: var(--hair) solid transparent;

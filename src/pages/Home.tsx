@@ -6,7 +6,7 @@ import { STYLE_PRESETS } from '../../shared/styles';
 import { ASPECT_RATIOS } from '../../shared/actions';
 import { api } from '../lib/api';
 import { Brand } from '../components/ui/Brand';
-import { PointerTrail } from '@caramelo/design-system';
+import { MagneticButton, PointerTrail } from '@caramelo/design-system';
 import { Dropdown, Popover, anchorBelow, type Anchor } from '../components/ui/Menu';
 import { ProviderPill } from '../components/settings/ProviderPill';
 import { useUi, toast } from '../store/ui';
@@ -88,9 +88,14 @@ export function Home() {
           <button className="icon-btn" title="Configurações" onClick={() => useUi.getState().setSettingsOpen(true)}>
             <Settings size={16} />
           </button>
-          <button className="btn btn-primary btn-sm" onClick={() => start('', 'Sem título')}>
+          <MagneticButton
+            variant="accent"
+            size="sm"
+            className="topbar-cta"
+            onClick={() => start('', 'Sem título')}
+          >
             <Plus size={13} /> Criar
-          </button>
+          </MagneticButton>
         </div>
       </header>
 
